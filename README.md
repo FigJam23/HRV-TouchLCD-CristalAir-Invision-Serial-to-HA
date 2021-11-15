@@ -2,7 +2,7 @@
 Using Serial TTL On A ESP Devices to extract Data Fom HRV Ventilation System and Send Data To Homeassistant
 
 
-'''
+```
 // Reads HRV TTL serial data and sends to an MQTT broker. Assumes you have HASSIO with MQTT running and configured.
 //
 // Requires:
@@ -567,4 +567,4 @@ void startWIFI()
 
 }
 
-'''
+```
