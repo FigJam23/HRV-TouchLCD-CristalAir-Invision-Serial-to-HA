@@ -33,4 +33,5 @@ sensor.yaml
 #define OPENHABHRVSUBCONTROL "hassio/hrv/controltemp"
 #define OPENHABHRVSUBFANSPEED "hassio/hrv/fanspeed"
 ```
-![image](https://user-images.githubusercontent.com/29391962/141736808-88bb39e2-ee69-4908-8db5-ccfc8718ff04.png)
+![HRV Hassio](https://user-images.githubusercontent.com/29391962/141737219-631d36ff-4ed0-4e42-ac0c-32908596b6b3.png)
+
