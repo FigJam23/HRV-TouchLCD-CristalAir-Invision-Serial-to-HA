@@ -1,5 +1,6 @@
 
 Still Working On this But Code Is working and pulling Data through to Hassio via sensor:
+Im using a D1mini but will work on esp8266 
 
 sensor.yaml
 ```
