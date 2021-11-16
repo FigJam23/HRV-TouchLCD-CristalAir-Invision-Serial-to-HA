@@ -39,7 +39,7 @@ subs:
 #define OPENHABHRVSUBCONTROL "hassio/hrv/controltemp"
 #define OPENHABHRVSUBFANSPEED "hassio/hrv/fanspeed"
 
-at the moment there are no controlls e.g tuning on off or seeting fan speeds and on off times / burnt toast mode hopfully I can get comands to work..
+at the moment there are no controlls e.g tuning on off or setting fan speeds and on off times / burnt toast mode hopfully I can get comands to work..
 
 
 ![HRV Hassio](https://user-images.githubusercontent.com/29391962/141737219-631d36ff-4ed0-4e42-ac0c-32908596b6b3.png)
