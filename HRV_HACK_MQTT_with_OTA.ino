@@ -45,8 +45,8 @@
 #define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
 
 // Wifi
-const char* ssid     = "Reaver";
-const char* password = "FigjamDilligaf74";
+const char* ssid     = "SSID";
+const char* password = "PASSWORD";
 
 // MQTT Broker
 IPAddress MQTT_SERVER(192, 168, 1, 44);
