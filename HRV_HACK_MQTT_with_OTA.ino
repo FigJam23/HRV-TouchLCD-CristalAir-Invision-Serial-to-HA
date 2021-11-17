@@ -1,3 +1,4 @@
+
 // Reads HRV TTL serial data and sends to an MQTT broker. Assumes you have HASSIO with MQTT running and configured.
 //
 // Requires:
@@ -32,6 +33,7 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoOTA.h>
 #include "basicOTA.h"
+
 // HRV constants
 #define MSGSTARTSTOP 0x7E
 #define HRVROOF 0x30
@@ -46,7 +48,7 @@
 
 // Wifi
 const char* ssid     = "SSID";
-const char* password = "PASSWORD";
+const char* password = "Password";
 
 // MQTT Broker
 IPAddress MQTT_SERVER(192, 168, 1, 44);
@@ -93,17 +95,14 @@ IPAddress ipadd;
 // Callback to Arduino from MQTT (inbound message arrives for a subscription)
 // Potential future use...
 /*void callback(char* topic, byte* payload, unsigned int length) {
-
   // Messaging inbound from MQTT broker
   int iChar = 0;
   for(iChar=0; iChar<length; iChar++) {
     message_buff[iChar] = payload[iChar];
   }
   message_buff[iChar] = '\0';
-
   Serial.println("MQTT callback");
   // This could be used in a future revision to control the HRV control panel remotely?
-
 }*/
 
 // Define Publish / Subscribe client (must be defined after callback function above if in use)
@@ -115,6 +114,9 @@ PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
 //
 void setup()
 {
+
+  // Setup Firmware update over the air (OTA)
+  setup_OTA();
   
   // Set builtin LED as connection indicator
   pinMode(LED_BUILTIN, OUTPUT);
@@ -140,12 +142,14 @@ void setup()
 
 void loop()
 {
+  // Check for OTA updates
+  ArduinoOTA.handle();
+
 
   // If not MQTT connected, try connecting
   if (!mqttClient.connected())  
   {
-    // Check for OTA updates
-    ArduinoOTA.handle();
+
     // Check its not cause WiFi dropped
     startWIFI();
     
@@ -557,12 +561,10 @@ void startWIFI()
       Serial.println("WiFi connected");
       Serial.println(WiFi.localIP());
       
-      // Setup Firmware update over the air (OTA)
-      setup_OTA();
-      
       // Let network have a chance to start up
       myDelay(1500);
 
     }
 
 }
+
