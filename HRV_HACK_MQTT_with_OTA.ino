@@ -48,13 +48,13 @@
 
 // Wifi
 const char* ssid     = "SSID";
-const char* password = "PASSWORD";
+const char* password = "Password";
 
 // MQTT Broker
-IPAddress MQTT_SERVER(192, 168, 1, 44);
+IPAddress MQTT_SERVER(192, 168, 1, 0);
 
 // TTL hrvSerial on GPIO ports (HRV does not like RX/TX ports!)
-SoftwareSerial hrvSerial(D2, D3);  // RX, TX
+SoftwareSerial hrvSerial(D1, D2);  // RX, TX
 
 // The MAC address of the Arduino
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -550,7 +550,7 @@ void startWIFI()
         delay(2000);
         
         // If can't get to Wifi for 15 minutes, reboot ESP
-        if (iTries > 450)
+        if (iTries > 250)
         {
            Serial.println("TOO MANY WIFI ATTEMPTS, REBOOTING!");
            ESP.reset();
@@ -567,4 +567,3 @@ void startWIFI()
     }
 
 }
-
