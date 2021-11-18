@@ -44,7 +44,13 @@
 #define HASSIOHRVSUBHOUSE "hassio/hrv/housetemp"
 #define HASSIOHRVSUBROOF "hassio/hrv/rooftemp"
 #define HASSIOHRVSUBCONTROL "hassio/hrv/controltemp"
-#define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
+#define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeedInfo"
+
+// MQTT pubs
+#define HASSIOTESTINGPOWERCONTROL "hassio/hrv/powercontrol"
+#define HASSIOTESTINGBURNTTOASTMODE "hassio/hrv/burnttoast"
+#define HASSIOTESTINGVENTERLATIONLEVEL "hassio/hrv/venterlationlevel"
+#define HASSIOTESTINGTEMPCONTROL "hassio/hrv/tempcontol"
 
 // Wifi
 const char* ssid     = "SSID";
@@ -549,8 +555,8 @@ void startWIFI()
         Serial.print(".");
         delay(2000);
         
-        // If can't get to Wifi for 15 minutes, reboot ESP
-        if (iTries > 250)
+        // If can't get to Wifi for 15 minutes, reboot ESP Default 450
+        if (iTries > 50)
         {
            Serial.println("TOO MANY WIFI ATTEMPTS, REBOOTING!");
            ESP.reset();
