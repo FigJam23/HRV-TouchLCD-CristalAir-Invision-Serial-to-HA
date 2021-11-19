@@ -39,6 +39,14 @@ subs:
 #define OPENHABHRVSUBCONTROL "hassio/hrv/controltemp"
 #define OPENHABHRVSUBFANSPEED "hassio/hrv/fanspeed"
 
+// MQTT pubs Testing Not yet functional 
+#define HASSIOTESTINGPOWERCONTROL "hassio/hrv/powercontrol"
+#define HASSIOTESTINGBURNTTOASTMODE "hassio/hrv/burnttoast"
+#define HASSIOTESTINGVENTERLATIONLEVEL "hassio/hrv/venterlationlevel"
+#define HASSIOTESTINGTEMPCONTROL "hassio/hrv/tempcontol"
+
+
+
 at the moment there are no controlls e.g tuning on off or setting fan speeds and on off times / burnt toast mode hopfully I can get comands to work..
 
 
