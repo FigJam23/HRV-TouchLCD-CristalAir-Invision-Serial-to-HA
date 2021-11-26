@@ -33,11 +33,11 @@ sensor.yaml
 
 subs:
   
-#define OPENHABHRVSTATUS "hassio/hrv/status"
-#define OPENHABHRVSUBHOUSE "hassio/hrv/housetemp"
-#define OPENHABHRVSUBROOF "hassio/hrv/rooftemp"
-#define OPENHABHRVSUBCONTROL "hassio/hrv/controltemp"
-#define OPENHABHRVSUBFANSPEED "hassio/hrv/fanspeed"
+#define HASSIOHRVSTATUS "hassio/hrv/status"
+#define HASSIOHRVSUBHOUSE "hassio/hrv/housetemp"
+#define HASSIOHRVSUBROOF "hassio/hrv/rooftemp"
+#define HASSIOHRVSUBCONTROL "hassio/hrv/controltemp"
+#define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
 
 // MQTT pubs Testing Not yet functional 
 #define HASSIOTESTINGPOWERCONTROL "hassio/hrv/powercontrol"
