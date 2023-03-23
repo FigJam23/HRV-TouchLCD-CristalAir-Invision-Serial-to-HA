@@ -573,3 +573,18 @@ void startWIFI()
     }
 
 }
+
+
+
+// To add MQTT username and password to the code, you can modify the line that defines the WiFiClient object to include the credentials like this:
+
+// WiFiClient wifiClient;
+// const char* mqtt_username = "your_mqtt_username";
+// const char* mqtt_password = "your_mqtt_password";
+// PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
+
+// Then, you can add the following lines to the setup() function to connect to the MQTT broker with the username and password:
+
+// mqttClient.setCredentials(mqtt_username, mqtt_password);
+// mqttClient.connect("HRVController");
+
