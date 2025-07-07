@@ -7,8 +7,8 @@ esp8266:
 
 # Wi-Fi
 wifi:
-  ssid: "Reaver"
-  password: "FigjamDilligaf74"
+  ssid: "Rr"
+  password: "Fig"
   ap:
     ssid: "Hrv Fallback Hotspot"
     password: "UFTWi1OCP7LR"
@@ -17,10 +17,10 @@ wifi:
 logger:
 api:
   encryption:
-    key: "5rEiR7F97qaidgqj0yGGr73dBIIvh4IBSMiuT051v1c="
+    key: "5rEiR7F97qar73dBII"
 ota:
   - platform: esphome
-    password: "acf68007042ea670c7fe04215db590bb"
+    password: "acf6804215db590bb"
 
 # MQTT broker (same topics as your sketch)
 mqtt:
