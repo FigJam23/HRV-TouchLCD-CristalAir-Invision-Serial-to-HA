@@ -1,0 +1,109 @@
+esphome:
+  name: hrv
+  friendly_name: HRV
+
+esp8266:
+  board: d1_mini
+
+# Wi-Fi
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "UFTWi1OCP7LR"
+
+# Logging & OTA
+logger:
+api:
+  encryption:
+    key: "5rEiR7F97qaidgqj0yGGr73dBIIvh4IBSMiuT051v1c="
+ota:
+  - platform: esphome
+    password: "acf68007042ea670c7fe04215db590bb"
+
+# MQTT broker (same topics as your sketch)
+mqtt:
+  id: hrv_mqtt
+  broker: 192.168.1.0
+  discovery: false
+
+# LED indicator (mirrors your LED logic crudely)
+output:
+  - platform: gpio
+    pin: GPIO2      # onboard LED on D1 mini
+    id: led
+    inverted: true  # active-low
+
+# UART for HRV data
+uart:
+  id: hrv_uart
+  rx_pin: D1
+  tx_pin: D2
+  baud_rate: 1200
+
+# Script to parse & publish
+script:
+  - id: parse_hrv
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> buf;
+          // Read all pending bytes
+          while (id(hrv_uart).available()) {
+            uint8_t c;
+            // read_byte takes a pointer to your uint8_t
+            if (!id(hrv_uart).read_byte(&c)) {
+              continue;
+            }
+            buf.push_back(c);
+            // No data? LED on solid
+            if (buf.empty()) {
+              id(led).turn_on();
+            } else {
+              id(led).turn_off();
+            }
+            // Frame detection: end-marker 0x7E
+            if (c == 0x7E && buf.size() >= 6) {
+              // helper to convert hi/lo → temperature
+              auto hex_to_dec = [&](uint8_t hi, uint8_t lo){
+                uint16_t v = (uint16_t(hi) << 8) | lo;
+                return float(v) * 0.0625;
+              };
+              char loc = buf[1];
+              float temp = hex_to_dec(buf[2], buf[3]);
+              // nearest 0.5°C
+              temp = round(temp * 2.0) / 2.0;
+
+              // Publish status “I'm alive” every 30s
+              static unsigned long last_alive = 0;
+              if (millis() - last_alive > 30000) {
+                id(hrv_mqtt).publish("hassio/hrv/status", "1");
+                last_alive = millis();
+              }
+
+              // House vs Roof
+              if (loc == 0x31) {
+                id(hrv_mqtt).publish("hassio/hrv/housetemp", String(temp).c_str());
+              } else if (loc == 0x30) {
+                id(hrv_mqtt).publish("hassio/hrv/rooftemp", String(temp).c_str());
+              }
+
+              // Control setpoint & fan speed
+              char bufstr[16];
+              sprintf(bufstr, "%d", buf[5]);
+              id(hrv_mqtt).publish("hassio/hrv/controltemp", bufstr);
+
+              sprintf(bufstr, "%d", buf[4]);
+              id(hrv_mqtt).publish("hassio/hrv/fanspeedInfo", bufstr);
+
+              buf.clear();
+            }
+            // prevent runaway
+            if (buf.size() > 20) buf.erase(buf.begin());
+          }
+
+# Run the parser continuously
+interval:
+  - interval: 100ms
+    then:
+      - script.execute: parse_hrv
