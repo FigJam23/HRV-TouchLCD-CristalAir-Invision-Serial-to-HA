@@ -5,35 +5,38 @@ esphome:
 esp8266:
   board: d1_mini
 
-# Wi-Fi
+# Wi-Fi + fallback AP
 wifi:
-  ssid: "Rr"
-  password: "Fig"
+  ssid: "Rer"
+  password: "Fig4"
   ap:
     ssid: "Hrv Fallback Hotspot"
     password: "UFTWi1OCP7LR"
 
-# Logging & OTA
+# Logging, OTA & native API
 logger:
 api:
   encryption:
-    key: "5rEiR7F97qar73dBII"
+    key: "5rEiRSMiuT051v1c="
 ota:
   - platform: esphome
-    password: "acf6804215db590bb"
+    password: "acf68590bb"
 
-# MQTT broker (same topics as your sketch)
+# MQTT broker for raw frames
 mqtt:
   id: hrv_mqtt
-  broker: 192.168.1.0
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
   discovery: false
+  topic_prefix: "hrv"
 
-# LED indicator (mirrors your LED logic crudely)
+# On-board LED indicator
 output:
   - platform: gpio
-    pin: GPIO2      # onboard LED on D1 mini
+    pin: GPIO2
     id: led
-    inverted: true  # active-low
+    inverted: true
 
 # UART for HRV data
 uart:
@@ -42,67 +45,91 @@ uart:
   tx_pin: D2
   baud_rate: 1200
 
-# Script to parse & publish
+# Template sensors for parsed values
+sensor:
+  - platform: template
+    name: "HRV House Temp"
+    id: hrv_house_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "HRV Roof Temp"
+    id: hrv_roof_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "HRV Control Setpoint"
+    id: hrv_setpoint
+    unit_of_measurement: "°C"
+
+  - platform: template
+    name: "HRV Fan Speed"
+    id: hrv_fan_speed
+    unit_of_measurement: "%"
+    icon: "mdi:fan"
+
+# Parser script reads frames, updates sensors, and gathers raw hex into raw_buf
+globals:
+  - id: raw_buf
+    type: std::string
+    restore_value: false
+    initial_value: ""
+
 script:
   - id: parse_hrv
     then:
       - lambda: |-
           static std::vector<uint8_t> buf;
-          // Read all pending bytes
           while (id(hrv_uart).available()) {
             uint8_t c;
-            // read_byte takes a pointer to your uint8_t
-            if (!id(hrv_uart).read_byte(&c)) {
-              continue;
+            if (!id(hrv_uart).read_byte(&c)) continue;
+
+            // Append each byte in hex to the global raw_buf
+            {
+              char tmp[4];
+              sprintf(tmp, "%02X ", c);
+              auto &rb = id(raw_buf);
+              rb += tmp;
+              if (rb.size() > 100) rb.erase(0, rb.size() - 100);
             }
+
             buf.push_back(c);
-            // No data? LED on solid
-            if (buf.empty()) {
-              id(led).turn_on();
-            } else {
-              id(led).turn_off();
-            }
-            // Frame detection: end-marker 0x7E
+
+            // LED on when idle, off when reading
+            if (buf.empty()) id(led).turn_on();
+            else             id(led).turn_off();
+
+            // Frame end detected
             if (c == 0x7E && buf.size() >= 6) {
-              // helper to convert hi/lo → temperature
               auto hex_to_dec = [&](uint8_t hi, uint8_t lo){
                 uint16_t v = (uint16_t(hi) << 8) | lo;
                 return float(v) * 0.0625;
               };
               char loc = buf[1];
-              float temp = hex_to_dec(buf[2], buf[3]);
-              // nearest 0.5°C
-              temp = round(temp * 2.0) / 2.0;
+              float temp = round(hex_to_dec(buf[2], buf[3]) * 2.0) / 2.0;
 
-              // Publish status “I'm alive” every 30s
-              static unsigned long last_alive = 0;
-              if (millis() - last_alive > 30000) {
-                id(hrv_mqtt).publish("hassio/hrv/status", "1");
-                last_alive = millis();
-              }
+              // Publish to template sensors
+              if (loc == 0x31)
+                id(hrv_house_temp).publish_state(temp);
+              else if (loc == 0x30)
+                id(hrv_roof_temp).publish_state(temp);
+              id(hrv_setpoint).publish_state(buf[5]);
+              id(hrv_fan_speed).publish_state(buf[4]);
 
-              // House vs Roof
-              if (loc == 0x31) {
-                id(hrv_mqtt).publish("hassio/hrv/housetemp", String(temp).c_str());
-              } else if (loc == 0x30) {
-                id(hrv_mqtt).publish("hassio/hrv/rooftemp", String(temp).c_str());
-              }
+              // Publish raw hex frame over MQTT
+              id(hrv_mqtt).publish("raw_frame", id(raw_buf).c_str());
 
-              // Control setpoint & fan speed
-              char bufstr[16];
-              sprintf(bufstr, "%d", buf[5]);
-              id(hrv_mqtt).publish("hassio/hrv/controltemp", bufstr);
-
-              sprintf(bufstr, "%d", buf[4]);
-              id(hrv_mqtt).publish("hassio/hrv/fanspeedInfo", bufstr);
-
+              // Clear both buffers
               buf.clear();
+              id(raw_buf).clear();
             }
-            // prevent runaway
             if (buf.size() > 20) buf.erase(buf.begin());
           }
 
-# Run the parser continuously
+
+# Continuously invoke the parser
 interval:
   - interval: 100ms
     then:
