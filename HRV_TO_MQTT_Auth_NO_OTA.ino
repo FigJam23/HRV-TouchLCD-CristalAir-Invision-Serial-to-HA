@@ -1,191 +1,108 @@
-// Reads HRV TTL serial data and sends to an MQTT broker. Assumes you have HASSIO with MQTT running and configured.
-//
-// Requires:
-//
-// - ESP8266-01 (other 3.3V versions should work) see: https://github.com/esp8266/esp8266-wiki/wiki/Hardware_versions
-// - TTL serial logic level converter (5V -> 3.3V) see: https://www.sparkfun.com/products/12009
-// - AMS1117 3.3V voltage regulator (or similar, between HRV VCC and ESP VCC)
-// - 1N5817 schottky diode (to stop HRV control panel resetting on ESP power on)
-// - 10K ohm resistor (pullup resistor between 3.3 Voltage Regulator and ESP CH_PD)
-// - 10V 100uF capacitor (or similar, to smooth out inbound power from HRV)
-// - 10V 10uF capacitor (or similar, to smooth out outbound power to ESP)
-// - Optional push button to reset the ESP
-
-//
-// Author:  Mike Davis
-// Date:    15 Nov 2021
-// Version: 1
-
-//
-// LEDs to indicate operation (for newer ESP's with LED onboard)
-// LED on solid = no serial data detected
-// LED turned off = no WIFI connection detected
-// LED blinking fast 10 times = no MQTT broker connection
-// LED blinking every 1-2 seconds = normal operation, sending MQTT data
-//
-// Credit to: http://www.hexperiments.com/?page_id=47 for data structure
-// Credit to: https://github.com/benrugg/Arduino-Hex-Decimal-Conversion for Dec/Hex conversion
-//
-
 #include <PubSubClient.h>
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
 // HRV constants
 #define MSGSTARTSTOP 0x7E
-#define HRVROOF 0x30
-#define HRVHOUSE 0x31
+#define HRVROOF      0x30
+#define HRVHOUSE     0x31
 
-// MQTT subs
-#define HASSIOHRVSTATUS "hassio/hrv/status"
-#define HASSIOHRVSUBHOUSE "hassio/hrv/housetemp"
-#define HASSIOHRVSUBROOF "hassio/hrv/rooftemp"
+// MQTT topics
+#define HASSIOHRVSTATUS    "hassio/hrv/status"
+#define HASSIOHRVSUBHOUSE  "hassio/hrv/housetemp"
+#define HASSIOHRVSUBROOF   "hassio/hrv/rooftemp"
 #define HASSIOHRVSUBCONTROL "hassio/hrv/controltemp"
 #define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
+#define HASSIOHRVRAW       "hassio/hrv/raw"
 
-// Wifi
+// Forward declarations
+void myDelay(int ms);
+void startWIFI();
+
+// Wi-Fi credentials
 const char* ssid     = "Reav";
 const char* password = "Figjam";
 
-// MQTT Broker
+// MQTT broker
 IPAddress MQTT_SERVER(192, 168, 1, 44);
 const char* mqttUser     = "mqtt";
-const char* mqttPassword = "Jus1111";
-// TTL hrvSerial on GPIO ports (HRV does not like RX/TX ports!)
-SoftwareSerial hrvSerial(D2, D3);  // RX, TX
+const char* mqttPassword = "Jus";
 
-// The MAC address of the Arduino
-byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+// SoftwareSerial for HRV TTL
+SoftwareSerial hrvSerial(D2, D3);
 
-// Define message buffer and publish string
-char message_buff[16];
-String pubString;
-int iTotalDelay;
-
-// TTL hrvSerial data indicators
-bool bStarted = false;
-bool bEnded = false;
-
-// Temperature from Roof or House?
-char eTempLoc;
-
-// TTL hrvSerial data array, bIndex, bIndex of checksum and temperature
-int iLoop;
-byte inData[10];
-byte bIndex;
-byte bChecksum;
-
-// Temperature for sending to MQTT
-float fHRVTemp;
-int iHRVControlTemp;
-int iHRVFanSpeed;
-
-// Maintain last temperature data, don't send MQTT unless changed
-float fHRVLastRoof;
-float fHRVLastHouse;
-int iHRVLastControl;
-int iHRVLastFanSpeed;
-
-// Wifi Client
-WiFiClient wifiClient;
-IPAddress ipadd;
-
-// Callback to Arduino from MQTT (inbound message arrives for a subscription)
-// Potential future use...
-/*void callback(char* topic, byte* payload, unsigned int length) {
-
-  // Messaging inbound from MQTT broker
-  int iChar = 0;
-  for(iChar=0; iChar<length; iChar++) {
-    message_buff[iChar] = payload[iChar];
-  }
-  message_buff[iChar] = '\0';
-
-  Serial.println("MQTT callback");
-  // This could be used in a future revision to control the HRV control panel remotely?
-
-}*/
-
-// Define Publish / Subscribe client (must be defined after callback function above if in use)
-PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
+// Globals for packet parsing & state
+bool   bStarted        = false, bEnded = false;
+byte   inData[10], bIndex = 0, bChecksum = 0;
+float  fHRVTemp, fHRVLastRoof = 255, fHRVLastHouse = 255;
+int    iHRVControlTemp, iHRVFanSpeed, iHRVLastControl = 255, iHRVLastFanSpeed = 255;
+int    iTotalDelay     = 0;
+char   eTempLoc;
+WiFiClient      wifiClient;
+PubSubClient    mqttClient(MQTT_SERVER, 1883, wifiClient);
+String          clientId;
+char            message_buff[16];
+String          pubString;
 
 
-//
-// Setup the ESP for operation
-//
-void setup()
-{
-  
-  // Set builtin LED as connection indicator
+// ----------------------------------------------------------------------------
+// SETUP
+// ----------------------------------------------------------------------------
+void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-
-  // LED ON to show powering up but no connection
-  digitalWrite(LED_BUILTIN, LOW); 
-
-  // Start HRV software serial (HRV sends at 1200 baud)
+  digitalWrite(LED_BUILTIN, LOW);
   hrvSerial.begin(1200);
-
-  // Debug USB Serial
   Serial.begin(115200);
-  //Serial.setDebugOutput(true);
   myDelay(10);
 
-  // Initialize defaults
-  bIndex = 0;
-  bChecksum = 0;
-  iTotalDelay=0;
-   
+  // Connect Wi-Fi & prep MQTT
+  startWIFI();
+  clientId = "hrv-" + WiFi.macAddress();
+  mqttClient.setKeepAlive(120);
+
+  // Reset packet state
+  bIndex      = 0;
+  bChecksum   = 0;
+  iTotalDelay = 0;
 }
 
-
-// … all your includes, defines, globals, setup() unchanged …
-
+// ----------------------------------------------------------------------------
+// LOOP
+// ----------------------------------------------------------------------------
 void loop() {
-  // If not MQTT connected, try connecting
+  // ─── MQTT reconnect block ───
   if (!mqttClient.connected()) {
-    // Check it’s not because WiFi dropped
     startWIFI();
-
-    // Indicate we’re connecting with credentials
     Serial.println("Connecting to MQTT Broker with credentials…");
-
-    // Force resend flags on reconnect
-    iHRVLastFanSpeed = 255;
-    iHRVLastControl  = 255;
-    fHRVLastRoof     = 255;
-    fHRVLastHouse    = 255;
-
-    // Authenticate with username & password
-    while (!mqttClient.connect("hrvwireless", mqttUser, mqttPassword)) {
-      Serial.print("Error connecting to MQTT (rc=");
-      Serial.print(mqttClient.state());
-      Serial.println("), retrying in 2s");
-      // blink LED to indicate failure
-      for (int iPos = 0; iPos < 10; iPos++) {
-        digitalWrite(LED_BUILTIN, LOW);
-        myDelay(75);
-        digitalWrite(LED_BUILTIN, HIGH);
-        myDelay(75);
+    clientId = "hrv-" + WiFi.macAddress();
+    mqttClient.setKeepAlive(120);
+    // Force full resend
+    iHRVLastFanSpeed = iHRVLastControl = 255;
+    fHRVLastRoof     = fHRVLastHouse   = 255;
+    while (!mqttClient.connect(clientId.c_str(), mqttUser, mqttPassword)) {
+      Serial.printf("MQTT failed, rc=%d — retrying in 2s\n", mqttClient.state());
+      // blink LED 10×
+      for (int i = 0; i < 10; i++) {
+        digitalWrite(LED_BUILTIN, LOW);  myDelay(75);
+        digitalWrite(LED_BUILTIN, HIGH); myDelay(75);
       }
       delay(2000);
     }
     Serial.println("MQTT connected!");
   }
+  // ────────────────────────────
 
-  // LED back on solid if no serial data
+  // Indicate serial-data presence
   if (hrvSerial.available() == 0) {
     Serial.println("No serial data detected!");
     digitalWrite(LED_BUILTIN, LOW);
   } else {
-    // Data available, LED on
     digitalWrite(LED_BUILTIN, HIGH);
   }
 
-  // Only if we’ve got data from the HRV
+  // Read & buffer HRV bytes
   while (hrvSerial.available() > 0) {
     int inChar = hrvSerial.read();
-
-    // Start/stop marker or data too long
     if (inChar == MSGSTARTSTOP || bIndex > 8) {
       if (bIndex == 0) {
         bStarted = true;
@@ -195,25 +112,16 @@ void loop() {
         break;
       }
     }
-
-    // Buffer data bytes
-    if (bStarted) {
-      inData[bIndex++] = inChar;
-    }
-
-    // Feed WDT
+    if (bStarted) inData[bIndex++] = inChar;
     myDelay(1);
   }
 
-  // Validate packet checksum
+  // Validate checksum
   if (bStarted && bEnded && bChecksum > 0) {
-    int iChar = 0;
-    for (int iPos = 1; iPos < bChecksum; iPos++) {
-      iChar -= inData[iPos];
-    }
-    byte bCalc  = (byte)(iChar % 0x100);
-    byte bCheck = inData[bChecksum];
-    if (decToHex(bCalc, 2) != decToHex(bCheck, 2) || bIndex < 6) {
+    int sum = 0;
+    for (int i = 1; i < bChecksum; i++) sum -= inData[i];
+    byte calc = (byte)(sum % 0x100);
+    if (decToHex(calc,2) != decToHex(inData[bChecksum],2) || bIndex < 6) {
       bStarted = bEnded = false;
       bIndex = 0;
       hrvSerial.flush();
@@ -221,245 +129,160 @@ void loop() {
     bChecksum = 0;
   }
 
-  // Process a complete packet
+  // Process complete packet
   if (bStarted && bEnded && bIndex > 5) {
     String sHex1, sHex2;
-    for (int iPos = 1; iPos <= bIndex; iPos++) {
-      if (iPos == 1)                eTempLoc = inData[iPos];
-      if (iPos == 2)                sHex1    = decToHex(inData[iPos], 2);
-      if (iPos == 3)                sHex2    = decToHex(inData[iPos], 2);
-      if (eTempLoc == HRVHOUSE && iPos == 4) iHRVLastFanSpeed = inData[iPos];
-      if (eTempLoc == HRVHOUSE && iPos == 5) iHRVControlTemp  = inData[iPos];
+    for (int i = 1; i <= bIndex; i++) {
+      if (i==1)                eTempLoc = inData[i];
+      if (i==2)                sHex1    = decToHex(inData[i],2);
+      if (i==3)                sHex2    = decToHex(inData[i],2);
+      if (eTempLoc==HRVHOUSE && i==4) iHRVLastFanSpeed = inData[i];
+      if (eTempLoc==HRVHOUSE && i==5) iHRVControlTemp  = inData[i];
     }
-    fHRVTemp = hexToDec(sHex1 + sHex2) * 0.0625;
+    fHRVTemp = hexToDec(sHex1 + sHex2)*0.0625;
+
+    // ── Log raw packet hex to MQTT ──
+    {
+      String raw;
+      for (int i=0; i<bIndex; i++) {
+        if (inData[i]<0x10) raw += "0";
+        raw += String(inData[i], HEX) + " ";
+      }
+      raw.toUpperCase();
+      mqttClient.publish(HASSIOHRVRAW, raw.c_str());
+    }
+    // ───────────────────────────────
+
     SendMQTTMessage();
     bStarted = bEnded = false;
     bIndex = 0;
   } else {
-    // No full packet yet
     myDelay(2000);
   }
 
-  // Send “still alive” every 30s
-  if (WiFi.status() == WL_CONNECTED && mqttClient.connected() && iTotalDelay >= 30000) {
+  // Still-alive ping every 30 s
+  if (WiFi.status()==WL_CONNECTED && mqttClient.connected() && iTotalDelay>=30000) {
     Serial.println("Telling HASSIO we’re still alive");
     mqttClient.publish(HASSIOHRVSTATUS, "1");
     iTotalDelay = 0;
   }
 
-  // Let PubSubClient do its work
   mqttClient.loop();
 }
 
-// … the rest of your helpers (decToHex, hexToDec, SendMQTTMessage, myDelay, startWIFI) unchanged …
 
+// ----------------------------------------------------------------------------
+// HELPERS
+// ----------------------------------------------------------------------------
 
-
-//
-// Convert from decimal to hex
-//
-String decToHex(byte decValue, byte desiredStringLength) 
-{
-  
-  String hexString = String(decValue, HEX);
-  while (hexString.length() < desiredStringLength) hexString = "0" + hexString;
-  
-  return hexString;
+// Convert decimal to fixed-width hex string
+String decToHex(byte val, byte width) {
+  String s = String(val, HEX);
+  while (s.length() < width) s = "0" + s;
+  return s;
 }
 
-
-//
-// Convert from hex to decimal
-//
-unsigned int hexToDec(String hexString) 
-{
-  
-  unsigned int decValue = 0;
-  int nextInt;
-  
-  for (int i = 0; i < hexString.length(); i++) {
-    
-    nextInt = int(hexString.charAt(i));
-    if (nextInt >= 48 && nextInt <= 57) nextInt = map(nextInt, 48, 57, 0, 9);
-    if (nextInt >= 65 && nextInt <= 70) nextInt = map(nextInt, 65, 70, 10, 15);
-    if (nextInt >= 97 && nextInt <= 102) nextInt = map(nextInt, 97, 102, 10, 15);
-    nextInt = constrain(nextInt, 0, 15);
-    
-    decValue = (decValue * 16) + nextInt;
+// Convert hex string to decimal
+unsigned int hexToDec(String hex) {
+  unsigned int v = 0;
+  for (char c: hex) {
+    int d = (c>='0'&&c<='9') ? c-'0'
+          : (c>='A'&&c<='F') ? c-'A'+10
+          : (c>='a'&&c<='f') ? c-'a'+10
+          : 0;
+    v = v*16 + d;
   }
-  
-  return decValue;
+  return v;
 }
 
+// Send parsed temps/control/fan over MQTT
+void SendMQTTMessage() {
+  if (WiFi.status()!=WL_CONNECTED || !mqttClient.connected()) return;
 
-//
-// Send data to MQTT broker
-//
-void SendMQTTMessage()
-{
-  
-  // Get an exception when MQTT publishing without wifi connection, so quick check first
-  if (WiFi.status() == WL_CONNECTED && mqttClient.connected()) 
-  {
-    // Convert data to nearest 0.5 of a degree then convert to char array
-    int iHRVTemp;
-    iHRVTemp = (int) ((fHRVTemp * 2) + 0.5);
-    fHRVTemp = (float) iHRVTemp / 2;
-    pubString = String(fHRVTemp);
+  // House/Roof temp to nearest 0.5°
+  int tmp = int(fHRVTemp*2 + 0.5);
+  fHRVTemp = tmp/2.0;
+  pubString = String(fHRVTemp);
+  pubString.toCharArray(message_buff, pubString.length()+1);
+
+  if (eTempLoc==HRVHOUSE) {
+    Serial.print("House "); Serial.println(message_buff);
+    if (fHRVTemp != fHRVLastHouse) {
+      fHRVLastHouse = fHRVTemp;
+      mqttClient.publish(HASSIOHRVSUBHOUSE, message_buff);
+    }
+  }
+  else if (eTempLoc==HRVROOF) {
+    Serial.print("Roof "); Serial.println(message_buff);
+    if (fHRVTemp != fHRVLastRoof) {
+      fHRVLastRoof = fHRVTemp;
+      mqttClient.publish(HASSIOHRVSUBROOF, message_buff);
+    }
+  }
+
+  // Control set-temp (whole °) & fan speed
+  if (iHRVControlTemp != iHRVLastControl || iHRVLastFanSpeed==255) {
+    pubString = String(iHRVControlTemp);
     pubString.toCharArray(message_buff, pubString.length()+1);
-
-    // What data are we sending?
-    if (eTempLoc == HRVHOUSE)
-    {
-        Serial.print("House ");
-        Serial.println(message_buff);
-
-        // Only send if changed
-        if (fHRVTemp != fHRVLastHouse)
-        {
-          Serial.println("(sending)");
-          fHRVLastHouse = fHRVTemp;
-          mqttClient.publish(HASSIOHRVSUBHOUSE, message_buff); 
-        }
-    
-    }
-    else if (eTempLoc == HRVROOF)
-    {
-        Serial.print("Roof ");
-        Serial.println(message_buff);
-        
-        // Only send if changed by +/- 0.5 degrees
-        if (fHRVTemp != fHRVLastRoof)
-        {
-          Serial.println("(sending)");
-          fHRVLastRoof = fHRVTemp;
-          mqttClient.publish(HASSIOHRVSUBROOF, message_buff);
-        }
-    }
-
-    // Control Panel Set temperature in whole degrees, send if changed
-    if (iHRVControlTemp != iHRVLastControl || iHRVLastFanSpeed == 255)
-    {
-      pubString = String(iHRVControlTemp);
-      pubString.toCharArray(message_buff, pubString.length()+1);
-      iHRVLastControl = iHRVControlTemp;
-
-      Serial.print("Control Panel: ");
-      Serial.println(message_buff);
-      
-      mqttClient.publish(HASSIOHRVSUBCONTROL, message_buff); 
-    }
-
-    // If anything has changed
-    if (iHRVLastFanSpeed != iHRVLastFanSpeed || iHRVControlTemp != iHRVLastControl || (eTempLoc == HRVROOF && fHRVTemp != fHRVLastRoof) || (eTempLoc == HRVHOUSE && fHRVTemp != fHRVLastHouse))
-    {
-
-      iHRVLastFanSpeed = iHRVLastFanSpeed;
-
-      if (iHRVLastFanSpeed == 0)
-      {
-        pubString = "Off";
-      }
-      else if (iHRVLastFanSpeed == 5)
-      {
-        pubString = "Idle";
-      }
-      else if (iHRVLastFanSpeed == 100)
-      {
-        pubString = "Full";
-        
-        // Heating or Cooling?
-        if (iHRVLastControl >= fHRVLastRoof && fHRVLastRoof > fHRVLastHouse)
-        {
-          pubString = pubString + " (heating)";
-        }
-        else if (fHRVLastRoof <= iHRVLastControl && fHRVLastRoof < fHRVLastHouse)
-        {
-          pubString = pubString + " (cooling)";
-        }      
-      }
-      else
-      {
-        pubString = String(iHRVLastFanSpeed) + "%";
-      }
-
-      pubString.toCharArray(message_buff, pubString.length()+1);
-      Serial.print("Fan speed: ");
-      Serial.println(message_buff);
-      
-      mqttClient.publish(HASSIOHRVSUBFANSPEED, message_buff); 
-    }
-  
-    // Flash LED real quick to indicate we're still working, then chill a bit
-    digitalWrite(LED_BUILTIN, LOW);
-    myDelay(50);                    
-    digitalWrite(LED_BUILTIN, HIGH);  
-    myDelay(1000);
+    iHRVLastControl = iHRVControlTemp;
+    Serial.print("Control Panel: "); Serial.println(message_buff);
+    mqttClient.publish(HASSIOHRVSUBCONTROL, message_buff);
   }
- 
+
+  // Fan speed string
+  if (iHRVFanSpeed != iHRVLastFanSpeed || iHRVControlTemp!=iHRVLastControl
+      || (eTempLoc==HRVHOUSE && fHRVTemp!=fHRVLastHouse)
+      || (eTempLoc==HRVROOF  && fHRVTemp!=fHRVLastRoof))
+  {
+    iHRVLastFanSpeed = iHRVFanSpeed;
+    if (iHRVFanSpeed==0)         pubString="Off";
+    else if (iHRVFanSpeed==5)    pubString="Idle";
+    else if (iHRVFanSpeed==100) {
+      pubString="Full";
+      // heating/cooling note
+      if (iHRVLastControl>=fHRVLastRoof && fHRVLastRoof>fHRVLastHouse)
+        pubString += " (heating)";
+      else if (fHRVLastRoof<=iHRVLastControl && fHRVLastRoof<fHRVLastHouse)
+        pubString += " (cooling)";
+    }
+    else pubString = String(iHRVFanSpeed) + "%";
+
+    pubString.toCharArray(message_buff, pubString.length()+1);
+    Serial.print("Fan speed: "); Serial.println(message_buff);
+    mqttClient.publish(HASSIOHRVSUBFANSPEED, message_buff);
+  }
+
+  // flash LED to show MQTT work
+  digitalWrite(LED_BUILTIN, LOW);  myDelay(50);
+  digitalWrite(LED_BUILTIN, HIGH); myDelay(1000);
 }
 
-//
-// This function yields back to the watchdog to avoid random ESP8266 resets
-//
-void myDelay(int ms)  
-{
-
-  int i;
-  for(i=1; i!=ms; i++) 
-  {
+// Yield-friendly delay
+void myDelay(int ms) {
+  for (int i = 1; i <= ms; i++) {
     delay(1);
-    if(i%100 == 0) 
-   {
-      ESP.wdtFeed(); 
+    if (i % 100 == 0) {
+      ESP.wdtFeed();
+      mqttClient.loop();
       yield();
     }
   }
-
-  iTotalDelay+=ms;
-  
+  iTotalDelay += ms;
 }
 
-
-//
-// Starts WIFI connection
-//
-void startWIFI() 
-{
-
-    // If we are not connected
-    if (WiFi.status() != WL_CONNECTED) 
-    {
-      int iTries;
-      iTries=0;
-
-      Serial.println("Starting WIFI connection");
-      WiFi.mode(WIFI_STA);
-      WiFi.disconnect(); 
-      WiFi.begin(ssid, password);
-    
-      // If not WiFi connected, retry every 2 seconds for 15 minutes
-      while (WiFi.status() != WL_CONNECTED) 
-      {
-        iTries++;
-        Serial.print(".");
-        delay(2000);
-        
-        // If can't get to Wifi for 15 minutes, reboot ESP
-        if (iTries > 450)
-        {
-           Serial.println("TOO MANY WIFI ATTEMPTS, REBOOTING!");
-           ESP.reset();
-        }
-      }
-
-      Serial.println("");
-      Serial.println("WiFi connected");
-      Serial.println(WiFi.localIP());
-      
-      // Let network have a chance to start up
-      myDelay(1500);
-
-    }
-
+// Ensure Wi-Fi is connected (blocks until up or resets)
+void startWIFI() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  Serial.println("Starting WIFI connection");
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  WiFi.begin(ssid, password);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(2000);
+    if (++tries > 450) ESP.reset();
+  }
+  Serial.print("WiFi connected, IP=");
+  Serial.println(WiFi.localIP());
+  myDelay(1500);
 }
