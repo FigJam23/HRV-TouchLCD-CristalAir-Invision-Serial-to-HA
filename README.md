@@ -69,7 +69,7 @@ const char* mqttUser   = "mqtt";
 const char* mqttPass   = "Figjam";
 
 // HRV serial
-SoftwareSerial hrvSerial(D2, D3);  // RX, TX
+SoftwareSerial hrvSerial(D1, D2);  // RX, TX
 
 WiFiClient   wifiClient;
 PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
