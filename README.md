@@ -20,9 +20,7 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
 
 </p>
 
-![Keypad Raw Data](https://github.com/user-attachments/assets/3e54faf3-016b-4ee3-a427-b1be67cec29e)
-![Packet 1](https://github.com/user-attachments/assets/dccf78f7-616c-42dd-ad23-424ffa17d28e)
-![Packet 2](https://github.com/user-attachments/assets/096b9e28-bf64-4b4e-b08f-f855b45e05c4)
+
 ---
 
 ## 🚀 Features
