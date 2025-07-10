@@ -59,11 +59,11 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
 #define HASSIOHRVRAW         "hassio/hrv/raw"
 
 // Wi-Fi & MQTT
-const char* ssid       = "Reaver";
-const char* password   = "FigjamDilligaf74";
+const char* ssid       = "Rear";
+const char* password   = "Figjam";
 IPAddress   MQTT_SERVER(192, 168, 1, 44);
 const char* mqttUser   = "mqtt";
-const char* mqttPass   = "Justj33p";
+const char* mqttPass   = "Figjam";
 
 // HRV serial
 SoftwareSerial hrvSerial(D2, D3);  // RX, TX
