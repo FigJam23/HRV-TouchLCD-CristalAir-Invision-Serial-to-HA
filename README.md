@@ -17,10 +17,10 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
   <img src="https://user-images.githubusercontent.com/29391962/141737219-631d36ff-4ed0-4e42-ac0c-32908596b6b3.png" width="350" alt="HRV Hassio screenshot"/>
   <img src="https://user-images.githubusercontent.com/29391962/142518413-146c2566-e426-4eaf-9b21-13e86fca7d52.png" width="350" alt="ESP Hassio sensors"/>
 </p>
-![1000013309](https://github.com/user-attachments/assets/3e54faf3-016b-4ee3-a427-b1be67cec29e)
-![1000013319](https://github.com/user-attachments/assets/dccf78f7-616c-42dd-ad23-424ffa17d28e)
-![1000013323](https://github.com/user-attachments/assets/096b9e28-bf64-4b4e-b08f-f855b45e05c4)
 
+![Keypad Raw Data](https://github.com/user-attachments/assets/3e54faf3-016b-4ee3-a427-b1be67cec29e)
+![Packet 1](https://github.com/user-attachments/assets/dccf78f7-616c-42dd-ad23-424ffa17d28e)
+![Packet 2](https://github.com/user-attachments/assets/096b9e28-bf64-4b4e-b08f-f855b45e05c4)
 ---
 
 ## 🚀 Features
