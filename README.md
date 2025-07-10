@@ -9,8 +9,58 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
 - ESP8266 (D1 Mini shown; any 3.3 V ESP8266 will work)  
 - TTL logic-level shifter (5 V → 3.3 V)   
 - 1 cap
-- Optional: buck converter if you switch to an external 5 V supply  
+- Optional: buck converter if you switch to an external 5 V supply
 
+
+
+```
+
+HRV Keypad
+
+Logic Level Shifter (for TX/RX lines)
+
+Wiring Connections
+
+ESP8266 Pin
+
+Logic Level Shifter
+
+HRV Keypad Pin
+
+Wire Color
+
+5V
+
+-
+
+Positive (5V)
+
+Blue
+
+GND
+
+-
+
+Negative (GND)
+
+Black
+
+RX
+
+LV1 ←→ HV1
+
+TX
+
+Green
+
+TX
+
+LV2 ←→ HV2
+
+RX
+
+White 
+```
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/29391962/141737219-631d36ff-4ed0-4e42-ac0c-32908596b6b3.png" width="350" alt="HRV Hassio screenshot"/>
