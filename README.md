@@ -14,52 +14,29 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
 
 
 ```
+Components
+
+ESP8266 (Wemos D1 Mini)
 
 HRV Keypad
 
-Logic Level Shifter (for TX/RX lines)
+Logic Level Shifter (TX/RX)
 
 Wiring Connections
 
-ESP8266 Pin
+5V → Positive (5V) [Blue]
 
-Logic Level Shifter
+GND → Negative (GND) [Black]
 
-HRV Keypad Pin
+RX → LV1 ↔ HV1 → TX [Green]
 
-Wire Color
+TX → LV2 ↔ HV2 → RX [White]
 
-5V
+Notes
 
--
+Use logic level shifter for safe 3.3V-5V communication.
 
-Positive (5V)
-
-Blue
-
-GND
-
--
-
-Negative (GND)
-
-Black
-
-RX
-
-LV1 ←→ HV1
-
-TX
-
-Green
-
-TX
-
-LV2 ←→ HV2
-
-RX
-
-White 
+Verify RX/TX correctly connected.
 ```
 
 <p align="center">
