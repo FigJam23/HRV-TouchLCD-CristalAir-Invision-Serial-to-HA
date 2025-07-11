@@ -41,7 +41,7 @@ Verify RX/TX correctly connected.
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/29391962/141737219-631d36ff-4ed0-4e42-ac0c-32908596b6b3.png" width="350" alt="HRV Hassio screenshot"/>
-  <img src="https://user-images.githubusercontent.com/29391962/142518413-146c2566-e426-4eaf-9b21-13e86fca7d52.png" width="350" alt="ESP Hassio sensors"/>
+  <img width="1536" height="1024" alt="a89d5b17-fd74-491c-a819-e1b206736274" src="https://github.com/user-attachments/assets/ccee0cb8-b140-4ca7-a427-a638f3edf10d" />
   <img width="1035" height="777" alt="image" src="https://github.com/user-attachments/assets/18cdaeea-f2a3-4aa9-b0f8-0c1edc792d2e" />
 
 </p>
