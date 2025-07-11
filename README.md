@@ -334,36 +334,7 @@ void startWIFI() {
   myDelay(1500);
 }
 ```
----
 
-📝 Home Assistant sensor.yaml
-
-- platform: mqtt
-  state_topic: "hassio/hrv/status"
-  name: "HRV Status"
-
-- platform: mqtt
-  state_topic: "hassio/hrv/housetemp"
-  name: "House Temp"
-
-- platform: mqtt
-  state_topic: "hassio/hrv/rooftemp"
-  name: "Roof Temp"
-
-- platform: mqtt
-  state_topic: "hassio/hrv/controltemp"
-  name: "Control Panel Temp"
-
-- platform: mqtt
-  state_topic: "hassio/hrv/fanspeed"
-  name: "Fan Speed"
-
-- platform: mqtt
-  state_topic: "hassio/hrv/raw"
-  name: "HRV Raw Packet"
-
-
----
 
 MIT © Mike Figjam
 
