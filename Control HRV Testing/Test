@@ -1,1 +1,148 @@
 
+esphome:
+  name: hrv
+  friendly_name: HRV
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamD4"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway:  192.168.1.1
+    subnet:   255.255.255.0
+  power_save_mode: none
+  fast_connect: true
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "Justj33p"
+  on_connect:
+    - logger.log:
+        level: INFO
+        format: "WiFi up: %s"
+        args: ["!lambda | return WiFi.localIP().toString().c_str();"]
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+
+mqtt:
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
+  topic_prefix: "hassio/hrv"
+  discovery: false
+  on_connect:
+    - logger.log:
+        level: INFO
+        format: "MQTT Connected"
+
+uart:
+  id: hrv_uart
+  tx_pin: D1
+  rx_pin: D2
+  baud_rate: 1200
+  stop_bits: 1
+
+  # log every byte we receive
+  on_uart_data:
+    buffer: 64
+    then:
+      - lambda: |-
+          std::string in_hex;
+          char buf[4];
+          for (size_t i = 0; i < length; i++) {
+            sprintf(buf, "%02X ", data[i]);
+            in_hex += buf;
+          }
+          id(last_received_frame).publish_state(in_hex);
+          ESP_LOGD("UART_RX", "%s", in_hex.c_str());
+
+output:
+  - platform: gpio
+    pin: GPIO2
+    inverted: true
+    id: status_led
+
+globals:
+  - id: max_fan_mode
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    name: "HRV Max-Fan Mode"
+    id: max_fan_switch
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(max_fan_mode) = true;'
+    turn_off_action:
+      - lambda: 'id(max_fan_mode) = false;'
+
+text_sensor:
+  - platform: template
+    name: "Last Sent Frame"
+    id: last_sent_frame
+
+  - platform: template
+    name: "Last Received Frame"
+    id: last_received_frame
+
+sensor:
+  - platform: wifi_signal
+    name: "HRV Emulator WiFi Signal"
+    update_interval: 60s
+
+interval:
+  - interval: 1s
+    then:
+      # blink LED on transmit
+      - output.turn_on: status_led
+
+      # always send Frame A
+      - logger.log:
+          level: DEBUG
+          format: "→ Frame A: 7E 30 00 C2 00 0E"
+      - uart.write:
+          data: [0x7E, 0x30, 0x00, 0xC2, 0x00, 0x0E]
+      - lambda: |-
+          id(last_sent_frame).publish_state("7E 30 00 C2 00 0E");
+
+      - delay: 80ms
+
+      # Frame B: normal vs max-fan based on switch
+      - if:
+          condition:
+            lambda: 'return id(max_fan_mode);'
+          then:
+            - logger.log:
+                level: DEBUG
+                format: "→ Frame B (MAX-FAN): 7E 31 01 4E FF 84 70 51"
+            - uart.write:
+                data: [0x7E, 0x31, 0x01, 0x4E, 0xFF, 0x84, 0x70, 0x51]
+            - lambda: |-
+                id(last_sent_frame).publish_state("7E 31 01 4E FF 84 70 51");
+          else:
+            - logger.log:
+                level: DEBUG
+                format: "→ Frame B (NORMAL): 7E 31 01 4E 21 1A 84 70 51"
+            - uart.write:
+                data: [0x7E, 0x31, 0x01, 0x4E, 0x21, 0x1A, 0x84, 0x70, 0x51]
+            - lambda: |-
+                id(last_sent_frame).publish_state("7E 31 01 4E 21 1A 84 70 51");
+
+      # turn LED off after sending
+      - output.turn_off: status_led
