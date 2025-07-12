@@ -1,28 +1,22 @@
-
 esphome:
-  name: hrv
-  friendly_name: HRV
+  name: hrv_emulator
+  comment: "D1 Mini emulator that sends two frames every second and logs what it receives"
 
 esp8266:
   board: d1_mini
 
 wifi:
   ssid: "Reaver"
-  password: "FigjamD4"
+  password: "FigjamDilligaf74"
   manual_ip:
     static_ip: 192.168.1.100
-    gateway:  192.168.1.1
-    subnet:   255.255.255.0
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
   power_save_mode: none
   fast_connect: true
   ap:
     ssid: "Hrv Fallback Hotspot"
     password: "Justj33p"
-  on_connect:
-    - logger.log:
-        level: INFO
-        format: "WiFi up: %s"
-        args: ["!lambda | return WiFi.localIP().toString().c_str();"]
 
 logger:
   baud_rate: 115200
@@ -32,11 +26,9 @@ api:
   encryption:
     key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
 
-
 ota:
   platform: esphome
   password: "283355a588a90db0f31782330ad9f820"
-
 
 web_server:
   port: 80
@@ -52,6 +44,7 @@ mqtt:
         level: INFO
         format: "MQTT Connected"
 
+# UART to the HRV bus
 uart:
   id: hrv_uart
   tx_pin: D1
@@ -59,32 +52,26 @@ uart:
   baud_rate: 1200
   stop_bits: 1
 
-  # log every byte we receive
-  on_uart_data:
-    buffer: 64
-    then:
-      - lambda: |-
-          std::string in_hex;
-          char buf[4];
-          for (size_t i = 0; i < length; i++) {
-            sprintf(buf, "%02X ", data[i]);
-            in_hex += buf;
-          }
-          id(last_received_frame).publish_state(in_hex);
-          ESP_LOGD("UART_RX", "%s", in_hex.c_str());
-
+# LED to blink on each send
 output:
   - platform: gpio
     pin: GPIO2
     inverted: true
     id: status_led
 
+# Globals
 globals:
   - id: max_fan_mode
     type: bool
     restore_value: no
     initial_value: 'false'
 
+  - id: rx_buffer_string
+    type: std::string
+    restore_value: no
+    initial_value: ""
+
+# Switch to toggle normal vs max‐fan frame B
 switch:
   - platform: template
     name: "HRV Max-Fan Mode"
@@ -95,27 +82,47 @@ switch:
     turn_off_action:
       - lambda: 'id(max_fan_mode) = false;'
 
+# Last‐sent and last‐received frames in Home Assistant
 text_sensor:
   - platform: template
-    name: "Last Sent Frame"
+    name: "HRV Last Sent Frame"
     id: last_sent_frame
 
   - platform: template
-    name: "Last Received Frame"
+    name: "HRV Last Received Frame"
     id: last_received_frame
 
+# Wi-Fi signal just to show it’s alive
 sensor:
   - platform: wifi_signal
     name: "HRV Emulator WiFi Signal"
     update_interval: 60s
 
+# Poll for any incoming UART bytes every 200 ms, accumulate & publish
 interval:
+  - interval: 200ms
+    then:
+      - lambda: |-
+          // pull whatever bytes are queued on UART
+          uint8_t c;
+          while (id(hrv_uart).read_byte(&c)) {
+            char buf[4];
+            sprintf(buf, "%02X ", c);
+            id(rx_buffer_string) += buf;
+          }
+          // if we saw anything, publish & clear
+          if (!id(rx_buffer_string).empty()) {
+            ESP_LOGD("UART_RX", "← %s", id(rx_buffer_string).c_str());
+            id(last_received_frame).publish_state(id(rx_buffer_string));
+            id(rx_buffer_string).clear();
+          }
+
+# Every second: blink LED and send the two frames back to back
   - interval: 1s
     then:
-      # blink LED on transmit
       - output.turn_on: status_led
 
-      # always send Frame A
+      # Frame A: always the same
       - logger.log:
           level: DEBUG
           format: "→ Frame A: 7E 30 00 C2 00 0E"
@@ -124,9 +131,9 @@ interval:
       - lambda: |-
           id(last_sent_frame).publish_state("7E 30 00 C2 00 0E");
 
-      - delay: 80ms
+      - delay: 100ms
 
-      # Frame B: normal vs max-fan based on switch
+      # Frame B: vary by the switch
       - if:
           condition:
             lambda: 'return id(max_fan_mode);'
@@ -147,5 +154,5 @@ interval:
             - lambda: |-
                 id(last_sent_frame).publish_state("7E 31 01 4E 21 1A 84 70 51");
 
-      # turn LED off after sending
+      - delay: 5ms
       - output.turn_off: status_led
