@@ -90,22 +90,20 @@ Verify RX/TX correctly connected.
   - Flags (raw, decimal, binary, individual bits)
 - **MQTT topics**  
   ```cpp
-#define HASSIOHRVSTATUS        "hassio/hrv/status"       // Alive heartbeat
-#define HASSIOHRVSUBHOUSE      "hassio/hrv/housetemp"    // House temp
-#define HASSIOHRVSUBROOF       "hassio/hrv/rooftemp"     // Roof temp
-#define HASSIOHRVSUBCONTROL    "hassio/hrv/controltemp"  // Control-panel setpoint
-#define HASSIOHRVSUBFANSPEED   "hassio/hrv/fanspeed"     // Fan speed
-#define HASSIOHRVHUMIDITY_RAW  "hassio/hrv/humidity_raw" // Raw humidity byte
-#define HASSIOHRVHUMIDITY      "hassio/hrv/humidity"     // Scaled 0–100% RH
-#define HASSIOHRVRAW           "hassio/hrv/raw"          // Raw packet hex
-#define HASSIOHRVFLAGS_RAW     "hassio/hrv/flags_raw"    // Flags byte (hex)
-#define HASSIOHRVFLAGS_DEC     "hassio/hrv/flags_dec"    // Flags (decimal)
-#define HASSIOHRVFLAGS_BIN     "hassio/hrv/flags_bin"    // Flags (binary string)
-#define HASSIOHRVFLAGS_BIT     "hassio/hrv/flag/bit"     // Individual flag bits (append 0–7)
-#define HASSIOHRVMANUAL        "hassio/hrv/manual"       // Manual command topic
-
----
-```
+  #define HASSIOHRVSTATUS      "hassio/hrv/status"      // Alive heartbeat
+  #define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"   // House temp
+  #define HASSIOHRVSUBROOF     "hassio/hrv/rooftemp"    // Roof temp
+  #define HASSIOHRVSUBCONTROL  "hassio/hrv/controltemp" // Control-panel setpoint
+  #define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"    // Fan speed
+  #define HASSIOHRVRAW         "hassio/hrv/raw"         // Raw packet hex
+  #define HASSIOHRVHUMIDITY      "hassio/hrv/humidity"     // Scaled 0–100% RH
+  #define HASSIOHRVRAW           "hassio/hrv/raw"          // Raw packet hex
+  #define HASSIOHRVFLAGS_RAW     "hassio/hrv/flags_raw"    // Flags byte (hex)
+  #define HASSIOHRVFLAGS_DEC     "hassio/hrv/flags_dec"    // Flags (decimal)---
+  #define HASSIOHRVFLAGS_BIN     "hassio/hrv/flags_bin"    // Flags (binary string)
+  #define HASSIOHRVFLAGS_BIT     "hassio/hrv/flag/bit"     // Individual flag bits (append 0–7)
+  #define HASSIOHRVMANUAL        "hassio/hrv/manual"       // Manual command topic
+  
 ```
 ⚡ ESP8266 Sketch
 
