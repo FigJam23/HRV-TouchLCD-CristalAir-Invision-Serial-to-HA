@@ -27,7 +27,7 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
     src="https://github.com/user-attachments/assets/ccee0cb8-b140-4ca7-a427-a638f3edf10d"
   />
   <img
-    width="1035" height="777"
+     width="600" height="450"
     alt="third diagram"
     src="https://github.com/user-attachments/assets/1ade8a6f-7d6c-4dc5-b432-deb18a56c4c8"
   />
