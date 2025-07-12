@@ -87,30 +87,12 @@ Verify RX/TX correctly connected.
   - Fan speed  
 - **MQTT topics**  
   ```cpp
-// ─── HRV constants ──────────────────────────────────────────────────────────
-#define MSGSTARTSTOP     0x7E
-#define HRVROOF          0x30
-#define HRVHOUSE         0x31
-#define HRVHUMIDITY_PKT  0x37  // identify a humidity packet
----
-// ─── MQTT topics ────────────────────────────────────────────────────────────
-#define HASSIOHRVSTATUS      "hassio/hrv/status"
-#define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"
-#define HASSIOHRVSUBROOF     "hassio/hrv/rooftemp"
-#define HASSIOHRVSUBCONTROL  "hassio/hrv/controltemp"
-#define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
-#define HASSIOHRVRAW         "hassio/hrv/raw"
-#define HASSIOHRVHUMIDITY_RAW  "hassio/hrv/humidity_raw"
-#define HASSIOHRVHUMIDITY      "hassio/hrv/humidity"
----
-// flags topics
-#define HASSIOHRVFLAGS_RAW   "hassio/hrv/flags_raw"
-#define HASSIOHRVFLAGS_DEC   "hassio/hrv/flags_dec"
-#define HASSIOHRVFLAGS_BIN   "hassio/hrv/flags_bin"
-#define HASSIOHRVFLAGS_BIT   "hassio/hrv/flag/bit"  // append 0–7
----
-// manual command (not yet used)
-#define HASSIOHRVMANUAL      "hassio/hrv/manual"
+  #define HASSIOHRVSTATUS      "hassio/hrv/status"      // Alive heartbeat
+  #define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"   // House temp
+  #define HASSIOHRVSUBROOF     "hassio/hrv/rooftemp"    // Roof temp
+  #define HASSIOHRVSUBCONTROL  "hassio/hrv/controltemp" // Control-panel setpoint
+  #define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"    // Fan speed
+  #define HASSIOHRVRAW         "hassio/hrv/raw"         // Raw packet hex
 
 
 ---
