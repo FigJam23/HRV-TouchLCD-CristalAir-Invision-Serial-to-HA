@@ -1,0 +1,136 @@
+esphome:
+  name: hrv
+  friendly_name: HRV
+
+esp8266:
+  board: d1_mini
+
+# Wi-Fi + fallback AP
+wifi:
+  ssid: "Rer"
+  password: "Fig4"
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "UFTWi1OCP7LR"
+
+# Logging, OTA & native API
+logger:
+api:
+  encryption:
+    key: "5rEiRSMiuT051v1c="
+ota:
+  - platform: esphome
+    password: "acf68590bb"
+
+# MQTT broker for raw frames
+mqtt:
+  id: hrv_mqtt
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
+  discovery: false
+  topic_prefix: "hrv"
+
+# On-board LED indicator
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: led
+    inverted: true
+
+# UART for HRV data
+uart:
+  id: hrv_uart
+  rx_pin: D1
+  tx_pin: D2
+  baud_rate: 1200
+
+# Template sensors for parsed values
+sensor:
+  - platform: template
+    name: "HRV House Temp"
+    id: hrv_house_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "HRV Roof Temp"
+    id: hrv_roof_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "HRV Control Setpoint"
+    id: hrv_setpoint
+    unit_of_measurement: "°C"
+
+  - platform: template
+    name: "HRV Fan Speed"
+    id: hrv_fan_speed
+    unit_of_measurement: "%"
+    icon: "mdi:fan"
+
+# Parser script reads frames, updates sensors, and gathers raw hex into raw_buf
+globals:
+  - id: raw_buf
+    type: std::string
+    restore_value: false
+    initial_value: ""
+
+script:
+  - id: parse_hrv
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> buf;
+          while (id(hrv_uart).available()) {
+            uint8_t c;
+            if (!id(hrv_uart).read_byte(&c)) continue;
+
+            // Append each byte in hex to the global raw_buf
+            {
+              char tmp[4];
+              sprintf(tmp, "%02X ", c);
+              auto &rb = id(raw_buf);
+              rb += tmp;
+              if (rb.size() > 100) rb.erase(0, rb.size() - 100);
+            }
+
+            buf.push_back(c);
+
+            // LED on when idle, off when reading
+            if (buf.empty()) id(led).turn_on();
+            else             id(led).turn_off();
+
+            // Frame end detected
+            if (c == 0x7E && buf.size() >= 6) {
+              auto hex_to_dec = [&](uint8_t hi, uint8_t lo){
+                uint16_t v = (uint16_t(hi) << 8) | lo;
+                return float(v) * 0.0625;
+              };
+              char loc = buf[1];
+              float temp = round(hex_to_dec(buf[2], buf[3]) * 2.0) / 2.0;
+
+              // Publish to template sensors
+              if (loc == 0x31)
+                id(hrv_house_temp).publish_state(temp);
+              else if (loc == 0x30)
+                id(hrv_roof_temp).publish_state(temp);
+              id(hrv_setpoint).publish_state(buf[5]);
+              id(hrv_fan_speed).publish_state(buf[4]);
+
+              // Publish raw hex frame over MQTT
+              id(hrv_mqtt).publish("raw_frame", id(raw_buf).c_str());
+
+              // Clear both buffers
+              buf.clear();
+              id(raw_buf).clear();
+            }
+            if (buf.size() > 20) buf.erase(buf.begin());
+          }
+
+
+# Continuously invoke the parser
+interval:
+  - interval: 100ms
+    then:
+      - script.execute: parse_hrv
