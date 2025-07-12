@@ -17,10 +17,12 @@ wifi:
 logger:
 api:
   encryption:
-    key: "5rEiRSMiuT051v1c="
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
 ota:
-  - platform: esphome
-    password: "acf68590bb"
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
 
 # MQTT broker for raw frames
 mqtt:
