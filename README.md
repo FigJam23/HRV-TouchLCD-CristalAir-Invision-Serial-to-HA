@@ -92,7 +92,7 @@ Verify RX/TX correctly connected.
 #define HRVROOF          0x30
 #define HRVHOUSE         0x31
 #define HRVHUMIDITY_PKT  0x37  // identify a humidity packet
-
+---
 // ─── MQTT topics ────────────────────────────────────────────────────────────
 #define HASSIOHRVSTATUS      "hassio/hrv/status"
 #define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"
@@ -102,13 +102,13 @@ Verify RX/TX correctly connected.
 #define HASSIOHRVRAW         "hassio/hrv/raw"
 #define HASSIOHRVHUMIDITY_RAW  "hassio/hrv/humidity_raw"
 #define HASSIOHRVHUMIDITY      "hassio/hrv/humidity"
-
+---
 // flags topics
 #define HASSIOHRVFLAGS_RAW   "hassio/hrv/flags_raw"
 #define HASSIOHRVFLAGS_DEC   "hassio/hrv/flags_dec"
 #define HASSIOHRVFLAGS_BIN   "hassio/hrv/flags_bin"
 #define HASSIOHRVFLAGS_BIT   "hassio/hrv/flag/bit"  // append 0–7
-
+---
 // manual command (not yet used)
 #define HASSIOHRVMANUAL      "hassio/hrv/manual"
 
