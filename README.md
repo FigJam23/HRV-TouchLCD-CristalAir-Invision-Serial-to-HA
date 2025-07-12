@@ -15,6 +15,7 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
 
 
 
+<!-- Row 1: two images side by side -->
 <div style="
   display: flex;
   justify-content: center;
@@ -31,17 +32,21 @@ A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control
     alt="second diagram"
     src="https://github.com/user-attachments/assets/ccee0cb8-b140-4ca7-a427-a638f3edf10d"
   />
+</div>
+
+<!-- Row 2: single image, centered -->
+<div style="
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5em;
+">
   <img
-    style="
-      width: 30%;
-      height: auto;
-      transform: rotate(90deg);
-      transform-origin: center center;
-    "
-    alt="third diagram (rotated)"
+    style="width: 30%; height: auto;"
+    alt="third diagram"
     src="https://github.com/user-attachments/assets/1ade8a6f-7d6c-4dc5-b432-deb18a56c4c8"
   />
 </div>
+
 
 
 
