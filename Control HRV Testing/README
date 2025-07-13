@@ -1,0 +1,174 @@
+HRV Controller Hacking
+
+This repository documents our exploration of the HRV (Heat Recovery Ventilator) communication bus, including attempts to sniff, parse, and send commands using ESP8266 (D1 Mini) devices and Home Assistant automations. Below is a summary of what we've tried, key observations, and next steps.
+
+Table of Contents
+
+Overview
+
+Bus Protocol
+
+Sniffing & Parsing
+
+Sending Commands Attempts
+
+Brute-Force Automation
+
+ESPHome Emulators
+
+Keypad Behavior & Blocking
+
+Next Steps
+
+Contributing
+
+
+
+---
+
+Overview
+
+The HRV system uses a simple TTL-level serial bus with 7 bits at 1 200 baud. Each packet is delimited by 0x7E at both start and end, with the second byte indicating the packet type:
+
+Packet ID	Meaning
+
+0x30	Roof poll/response
+0x31	House poll/response
+0x37	Humidity-only packet
+others…	Filter life, vent level, kWh, version, etc.
+
+
+Payload bytes carry temperature, fan speed, setpoint, flags, and other status.
+
+
+---
+
+Sniffing & Parsing
+
+SoftwareSerial on D1 Mini: Captured raw bytes, validated checksums, parsed temperatures & flags.
+
+Home Assistant: MQTT telemetry exposed sensors for temperature, humidity, flags, raw hex.
+
+ESPhome: Script-based UART parser in C++ lambdas, publishing template sensors & text_sensors.
+
+
+All sniffing confirmed we can reliably read all bus traffic, including periodic polls (~1 sec) and button‐triggered bursts.
+
+
+---
+
+Sending Commands Attempts
+
+Initial approach: Mirrored observed frames (e.g. 7E 30 00 C2 00 0E … 7E) back to bus, but controller never responded.
+
+Underline: Frames lacked the trailing 0x7E terminator in code, so we updated to send full 7E … 7E packets.
+
+Keypad fight: With keypad attached, any commands we send are immediately overridden by keypad traffic.
+
+Keypad removal: When disconnecting keypad, controller stops polling, so our single-wire approach yields no data back—controller expects a master polling device.
+
+
+
+---
+
+Brute-Force Automation
+
+Using Home Assistant time_pattern automations & mqtt.publish:
+
+Increment an input_number index to generate packets of the form 7E 30 01 XX 00 CS 7E.
+
+Calculated checksum in Jinja: CS = (‑sum(hdr) & 0xFF).
+
+Logged raw packets and watched for any change.
+
+
+This approach yielded no successful control responses, but was useful to verify checksum logic and packet formatting.
+
+
+---
+
+ESPHome Emulators
+
+We built several ESPhome configs:
+
+1. Sniffer-only: Purely reads UART, publishes every byte in hex to a text_sensor.
+
+
+2. Two-frame emulator: Every second sends Frame A (poll) + Frame B (control) back to back, with toggles for “max fan” and “single-poll” modes.
+
+
+3. Single-poll mode: Sends poll only when toggled to sniff, then waits for controller response before sending control.
+
+
+
+Challenges:
+
+on_uart_data must be under uart_component, not top‐level.
+
+Must include both leading and trailing 0x7E in each write.
+
+write_array() signature requires pointer + size.
+
+
+
+---
+
+Keypad Behavior & Blocking
+
+Keypad as bus master: The official keypad drives the bus; when attached, it polls every second and stomps any foreign writes.
+
+Single-wire operation: Removing keypad stops all polling, so controller never sends data back.
+
+Pull-ups: Keypad uses ~10 kΩ pull-ups; the bus floats when disconnected.
+
+Hypothesis: The keypad holds a unique device ID or CASING checks bus arbitration; controller may ignore unknown transmitters unless keypad is truly absent (requires proper pull‑ups and termination).
+
+
+
+---
+
+Next Steps
+
+1. Keypad removal & bus termination
+
+Add 10 kΩ pull-ups to RX/TX lines and a valid termination resistor at 120 Ω to ground to mimic keypad idle.
+
+
+
+2. Emulate proper polling master
+
+Send only roof‑poll (0x7E 30 … 7E) at the exact interval, then await full response before replying.
+
+
+
+3. Extend command set
+
+Add more observed frames (e.g. filter life, vent boost, frost mode) into input_select or ESPhome switches.
+
+
+
+4. Logic analyzer
+
+Capture long traces of startup sequence; extract any ID or nonce used by keypad.
+
+
+
+
+
+---
+
+Contributing
+
+If you have access to a logic analyzer or have decoded additional packet types, please open an issue or submit a PR.
+
+Any improvements to the poll→response handshake or wiring hacks (termination, pull‑ups, level shifting) are greatly appreciated!
+
+
+---
+
+Last updated: {{ date }}
+
+
+
+I’ve drafted a comprehensive README.md summarizing our HRV bus exploration, sniffing & parsing approach, command‐send experiments, ESPhome emulators, keypad behavior, and next steps (including pull-ups & termination wiring). You can iterate on this directly or merge it into your GitHub repo as a starting point. Let me know if you’d like any additions or tweaks!
+
