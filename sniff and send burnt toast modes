@@ -1,0 +1,221 @@
+esphome:
+  name: hrv_emulator
+  comment: "D1 Mini HRV sniffer and emulator with individual code switches"
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  power_save_mode: none
+  fast_connect: true
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "Justj33p"
+  on_connect:
+    then:
+      - lambda: |-
+          ESP_LOGI("main", "WiFi up → %s", WiFi.localIP().toString().c_str());
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+
+mqtt:
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
+  topic_prefix: "hassio/hrv"
+  discovery: false
+  on_connect:
+    - logger.log:
+        level: INFO
+        format: "MQTT Connected"
+
+uart:
+  id: hrv_uart
+  rx_buffer_size: 512
+  tx_pin: D1
+  rx_pin: D2
+  baud_rate: 1200
+  stop_bits: 1
+
+output:
+  - platform: gpio
+    pin: GPIO2
+    inverted: true
+    id: status_led
+
+globals:
+  - id: sniff_only_mode
+    type: bool
+    initial_value: 'false'
+  - id: rx_buffer_string
+    type: std::string
+    initial_value: ""
+
+# Text sensors for last frames
+text_sensor:
+  - platform: template
+    name: "HRV Last Sent Frame"
+    id: last_sent_frame
+  - platform: template
+    name: "HRV Last Received Frame"
+    id: last_received_frame
+
+# Wi-Fi signal
+sensor:
+  - platform: wifi_signal
+    name: "HRV Emulator Wi-Fi Signal"
+    update_interval: 60s
+
+# Sniffer: read and publish any incoming bytes
+interval:
+  - interval: 200ms
+    then:
+      - lambda: |-
+          uint8_t c;
+          while (id(hrv_uart).read_byte(&c)) {
+            char tmp[4]; sprintf(tmp, "%02X ", c);
+            id(rx_buffer_string) += tmp;
+          }
+          if (!id(rx_buffer_string).empty()) {
+            ESP_LOGD("UART_RX", "← %s", id(rx_buffer_string).c_str());
+            id(last_received_frame).publish_state(id(rx_buffer_string));
+            id(rx_buffer_string).clear();
+          }
+
+# Individual switches to send test codes (auto-reset after send)
+switch:
+  - platform: template
+    name: "HRV Sniff-Only Mode"
+    id: sniff_only_mode_switch
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(sniff_only_mode) = true;'
+    turn_off_action:
+      - lambda: 'id(sniff_only_mode) = false;'
+
+  - platform: template
+    name: "HRV Initial Startup Sequence"
+    id: hrv_startup_seq
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t seq1[] = {0x7E,0x31,0x01,0x9C,0x00,0x1E,0x04,0x70,0xA0,0x7E};
+            id(hrv_uart).write_array(seq1, sizeof(seq1));
+            id(last_sent_frame).publish_state("7E 31 01 9C 00 1E 04 70 A0 7E");
+            delay(50);
+            static const uint8_t seq2[] = {0x7E,0x30,0x01,0x01,0x00,0xCE,0x7E};
+            id(hrv_uart).write_array(seq2, sizeof(seq2));
+            id(last_sent_frame).publish_state("7E 30 01 01 00 CE 7E");
+            delay(50);
+            static const uint8_t seq3[] = {0x7E,0x36,0x00,0x00,0x00,0xCA,0x7E};
+            id(hrv_uart).write_array(seq3, sizeof(seq3));
+            id(last_sent_frame).publish_state("7E 36 00 00 00 CA 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_off: hrv_startup_seq
+
+  - platform: template
+    name: "HRV Burnt Toast Mode On"
+    id: burnt_toast_on
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t b1[] = {0x7E,0x31,0x01,0x6F,0x21,0x1D,0x84,0x70,0x2D,0x7E};
+            id(hrv_uart).write_array(b1, sizeof(b1));
+            id(last_sent_frame).publish_state("7E 31 01 6F 21 1D 84 70 2D 7E");
+            delay(50);
+            static const uint8_t b2[] = {0x7E,0x30,0x00,0xF7,0x00,0xD9,0x7E};
+            id(hrv_uart).write_array(b2, sizeof(b2));
+            id(last_sent_frame).publish_state("7E 30 00 F7 00 D9 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_off: burnt_toast_on
+
+  - platform: template
+    name: "HRV Query Roof Poll"
+    id: query_roof_poll
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t qr[] = {0x7E,0x30,0x00,0xC2,0x00,0x0E,0x7E};
+            id(hrv_uart).write_array(qr, sizeof(qr));
+            id(last_sent_frame).publish_state("7E 30 00 C2 00 0E 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_off: query_roof_poll
+
+  - platform: template
+    name: "HRV Query House Poll"
+    id: query_house_poll
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t qh[] = {0x7E,0x31,0x01,0x4E,0x21,0x1A,0x84,0x70,0x51,0x7E};
+            id(hrv_uart).write_array(qh, sizeof(qh));
+            id(last_sent_frame).publish_state("7E 31 01 4E 21 1A 84 70 51 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_off: query_house_poll
+
+  - platform: template
+    name: "HRV Query Humidity"
+    id: query_humidity
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t qhum[] = {0x7E,0x37,0x01,0x26,0x00,0x1E,0x84,0x00,0x7E};
+            id(hrv_uart).write_array(qhum, sizeof(qhum));
+            id(last_sent_frame).publish_state("7E 37 01 26 00 1E 84 00 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_off: query_humidity
+
+  - platform: template
+    name: "HRV Query Unknown 36"
+    id: query_36
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          if (!id(sniff_only_mode)) {
+            id(status_led).turn_on();
+            static const uint8_t u36[] = {0x7E,0x36,0x00,0x00,0x00,0xCA,0x7E};
+            id(hrv_uart).write_array(u36, sizeof(u36));
+            id(last_sent_frame).publish_state("7E 36 00 00 00 CA 7E");
+            delay(50);
+            id(status_led).turn_off();
+          }
+      - switch.turn_on: query_36  # auto-reset on
