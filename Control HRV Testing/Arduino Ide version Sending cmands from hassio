@@ -1,0 +1,311 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <SoftwareSerial.h>
+#include <ctype.h>  // for isxdigit()
+
+// ─── HRV constants ──────────────────────────────────────────────────────────
+#define MSGSTARTSTOP     0x7E
+#define HRVROOF          0x30
+#define HRVHOUSE         0x31
+#define HRVHUMIDITY_PKT  0x37  // identify a humidity packet
+#define HRVFILTER_PKT    0x07  // filter life
+#define HRVENT_PKT       0x05  // ventilation level
+#define HRVKWH_PKT       0x06  // kWh saved
+#define HRVVER_PKT       0x01  // version/model + fw
+
+// ─── MQTT topics ────────────────────────────────────────────────────────────
+#define HASSIOHRVSTATUS       "hassio/hrv/status"
+#define HASSIOHRVRAW          "hassio/hrv/raw"
+#define HASSIOHRVSUBHOUSE     "hassio/hrv/housetemp"
+#define HASSIOHRVSUBROOF      "hassio/hrv/rooftemp"
+#define HASSIOHRVSUBCONTROL   "hassio/hrv/controltemp"
+#define HASSIOHRVSUBFANSPEED  "hassio/hrv/fanspeed"
+#define HASSIOHRVHUMIDITY_RAW "hassio/hrv/humidity_raw"
+#define HASSIOHRVHUMIDITY     "hassio/hrv/humidity"
+#define HASSIOHRVFLAGS_RAW    "hassio/hrv/flags_raw"
+#define HASSIOHRVFLAGS_DEC    "hassio/hrv/flags_dec"
+#define HASSIOHRVFLAGS_BIN    "hassio/hrv/flags_bin"
+#define HASSIOHRVFLAGS_BIT    "hassio/hrv/flag/bit"   // append 0–7
+#define HASSIOHRVFILTER_LIFE  "hassio/hrv/filter_life"
+#define HASSIOHRVVENT_LEVEL   "hassio/hrv/ventilation_level"
+#define HASSIOHRVKWH_SAVED    "hassio/hrv/kwh_saved"
+#define HASSIOHRVVER_MODEL    "hassio/hrv/version/model"
+#define HASSIOHRVVER_FW       "hassio/hrv/version/fw"
+#define HASSIOHRVMANUAL       "hassio/hrv/manual"
+
+// ─── Wi-Fi & MQTT creds ─────────────────────────────────────────────────────
+const char* ssid         = "Reaver";
+const char* password     = "FigjamDilligaf74";
+IPAddress   MQTT_SERVER  = IPAddress(192,168,1,44);
+const char* mqttUser     = "mqtt";
+const char* mqttPassword = "Justj33p";
+
+// ─── HRV bus on D2=RX, D1=TX ───────────────────────────────────────────────
+SoftwareSerial hrvSerial(D2, D1);
+
+// ─── Parser state & globals ─────────────────────────────────────────────────
+bool    bStarted        = false, bEnded = false;
+byte    inData[10], bIndex = 0, bChecksum = 0;
+float   fHRVTemp, fHRVLastRoof = 255, fHRVLastHouse = 255;
+int     iHRVControlTemp, iHRVFanSpeed,
+        iHRVLastControl = 255, iHRVLastFanSpeed = 255;
+int     iTotalDelay     = 0;
+char    eTempLoc;
+
+// ─── Networking & MQTT ─────────────────────────────────────────────────────
+WiFiClient   wifiClient;
+PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
+String       clientId;
+char         message_buff[16];
+String       pubString;
+
+// ─── Forward declarations ───────────────────────────────────────────────────
+void    myDelay(int ms);
+void    startWIFI();
+String  decToHex(byte val, byte width);
+unsigned int hexToDec(String hex);
+void    SendMQTTMessage();
+void    mqttCallback(char* topic, byte* payload, unsigned int length);
+
+// ─── Setup ─────────────────────────────────────────────────────────────────
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
+  hrvSerial.begin(1200);
+  Serial.begin(115200);
+  delay(10);
+
+  startWIFI();
+  clientId = "hrv-" + WiFi.macAddress();
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setServer(MQTT_SERVER, 1883);
+
+  // parser init
+  bIndex = bChecksum = 0;
+  iTotalDelay = 0;
+}
+
+// ─── Main loop ─────────────────────────────────────────────────────────────
+void loop() {
+  // ── Ensure MQTT connected & subscribe once ──────────────────────────────
+  if (!mqttClient.connected()) {
+    startWIFI();
+    Serial.println("Connecting to MQTT…");
+    clientId = "hrv-" + WiFi.macAddress();
+    iHRVLastFanSpeed = iHRVLastControl = 255;
+    fHRVLastRoof     = fHRVLastHouse   = 255;
+    while (!mqttClient.connect(clientId.c_str(), mqttUser, mqttPassword)) {
+      Serial.printf("MQTT rc=%d, retry in 2s\n", mqttClient.state());
+      for (int i = 0; i < 5; i++) {
+        digitalWrite(LED_BUILTIN, LOW);  delay(50);
+        digitalWrite(LED_BUILTIN, HIGH); delay(50);
+      }
+      delay(2000);
+    }
+    // now that we’re in, subscribe to manual‐inject topic
+    mqttClient.subscribe(HASSIOHRVMANUAL);
+    Serial.println("MQTT OK — subscribed to manual");
+    // ── keypad‐startup bursts ──────────────────────────────────────────────
+    static const uint8_t startup1[] = {0x7E,0x46,0x00,0x00,0x00,0xBA,   0x7E};
+    static const uint8_t startup2[] = {0x7E,0x37,0x01,0x56,0x00,0x1D,0x84,0xD1,0x7E};
+    static const uint8_t startup3[] = {0x7E,0x36,0x00,0x00,0x00,0xCA,   0x7E};
+    delay(500);
+    Serial.println("→ Sending keypad‐startup frames");
+    for (auto buf_p : {startup1, startup2, startup3}) {
+      size_t len = (buf_p == startup2 ? sizeof(startup2)
+                   : buf_p == startup3 ? sizeof(startup3)
+                                        : sizeof(startup1));
+      for (size_t i = 0; i < len; i++) hrvSerial.write(buf_p[i]);
+      Serial.print("   ");
+      for (size_t i = 0; i < len; i++) Serial.printf("%02X ", buf_p[i]);
+      Serial.println();
+      delay(100);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+  }
+  mqttClient.loop();
+
+  // ── Sniff + parse HRV bus exactly as before ─────────────────────────────
+  digitalWrite(LED_BUILTIN, hrvSerial.available() ? HIGH : LOW);
+  if (hrvSerial.available()) {
+    Serial.print("Bytes on HRV bus: ");
+    Serial.println(hrvSerial.available());
+  }
+  while (hrvSerial.available()) {
+    int c = hrvSerial.read();
+    if (c == MSGSTARTSTOP || bIndex > 8) {
+      if (!bStarted) { bStarted = true; bIndex = 0; }
+      else           { bChecksum = bIndex - 1; bEnded = true; break; }
+    }
+    if (bStarted && bIndex < sizeof(inData)) inData[bIndex++] = c;
+  }
+  if (bStarted && bEnded && bChecksum > 0) {
+    int sum = 0;
+    for (int i = 1; i < bChecksum; i++) sum -= inData[i];
+    byte calc = sum & 0xFF;
+    if (calc != inData[bChecksum] || bIndex < 6) {
+      bStarted = bEnded = false; bIndex = 0; hrvSerial.flush();
+    }
+  }
+  if (bStarted && bEnded && bIndex > 5) {
+    // parse, publish all packets (temps, flags, humidity, etc.)
+    String hx1 = decToHex(inData[2],2), hx2 = decToHex(inData[3],2);
+    eTempLoc = inData[1];
+    if (eTempLoc == HRVHOUSE) {
+      iHRVFanSpeed    = inData[4];
+      iHRVControlTemp = inData[5];
+    }
+    fHRVTemp = hexToDec(hx1 + hx2) * 0.0625;
+    switch (eTempLoc) {
+      case HRVHUMIDITY_PKT: {
+        byte raw = inData[3];
+        sprintf(message_buff,"%u",raw);
+        mqttClient.publish(HASSIOHRVHUMIDITY_RAW,message_buff);
+        float hum=raw*100.0/144.0;
+        dtostrf(hum,5,1,message_buff);
+        mqttClient.publish(HASSIOHRVHUMIDITY,message_buff);
+        Serial.printf("→ Humidity: %s %%RH\n",message_buff);
+      } break;
+      case HRVFILTER_PKT: {
+        byte raw=inData[3];
+        float fl=raw*100.0/255.0;
+        dtostrf(fl,5,1,message_buff);
+        mqttClient.publish(HASSIOHRVFILTER_LIFE,message_buff);
+        Serial.printf("→ Filter: %s %%\n",message_buff);
+      } break;
+      case HRVENT_PKT: {
+        byte lvl=inData[3];
+        sprintf(message_buff,"%u",lvl);
+        mqttClient.publish(HASSIOHRVVENT_LEVEL,message_buff);
+        Serial.printf("→ Vent: %u\n",lvl);
+      } break;
+      case HRVKWH_PKT: {
+        byte k=inData[3];
+        sprintf(message_buff,"%u",k);
+        mqttClient.publish(HASSIOHRVKWH_SAVED,message_buff);
+        Serial.printf("→ kWh: %u\n",k);
+      } break;
+      case HRVVER_PKT: {
+        sprintf(message_buff,"%02X",inData[3]);
+        mqttClient.publish(HASSIOHRVVER_MODEL,message_buff);
+        sprintf(message_buff,"%02X",inData[4]);
+        mqttClient.publish(HASSIOHRVVER_FW,message_buff);
+        Serial.printf("→ Model:%02X FW:%02X\n",inData[3],inData[4]);
+      } break;
+    }
+    byte flags = inData[6];
+    sprintf(message_buff,"%02X",flags);
+    mqttClient.publish(HASSIOHRVFLAGS_RAW,message_buff);
+    sprintf(message_buff,"%u",flags);
+    mqttClient.publish(HASSIOHRVFLAGS_DEC,message_buff);
+    { String bstr; for(int b=7;b>=0;b--) bstr += ((flags>>b)&1)?'1':'0';
+      mqttClient.publish(HASSIOHRVFLAGS_BIN,bstr.c_str());
+    }
+    for (int b=0;b<8;b++){
+      sprintf(message_buff,"%d",(flags>>b)&1);
+      char t[32]; sprintf(t,"%s%d",HASSIOHRVFLAGS_BIT,b);
+      mqttClient.publish(t,message_buff);
+    }
+    { String raw="";
+      for(int i=0;i<bIndex;i++){
+        if (inData[i]<0x10) raw+='0';
+        raw += String(inData[i],HEX) + ' ';
+      }
+      raw.toUpperCase();
+      mqttClient.publish(HASSIOHRVRAW,raw.c_str());
+    }
+    SendMQTTMessage();
+    bStarted=bEnded=false; bIndex=0;
+  }
+  if (iTotalDelay>=30000) {
+    mqttClient.publish(HASSIOHRVSTATUS,"1");
+    iTotalDelay=0;
+  }
+}
+
+// ─── MQTT callback: manual hex → HRV bus ───────────────────────────────────
+void mqttCallback(char* topic, byte* payload, unsigned int length){
+  String ascii;
+  for(unsigned int i=0;i<length;i++) ascii += (char)payload[i];
+  ascii.trim();
+  Serial.print("MANUAL CMD <- "); Serial.println(ascii);
+  char buf[3]={0,0,0};
+  for(unsigned int i=0;i+1<ascii.length();){
+    char c0=ascii[i],c1=ascii[i+1];
+    if(isxdigit(c0)&&isxdigit(c1)){
+      buf[0]=c0;buf[1]=c1;
+      byte b=(byte)strtol(buf,nullptr,16);
+      hrvSerial.write(b);
+      i+=2;
+    } else i++;
+  }
+  Serial.println("→ Sent manual bytes");
+}
+
+// ─── Helpers & MQTT‐publish routine ────────────────────────────────────────
+String decToHex(byte v, byte w){
+  String s=String(v,HEX);
+  while(s.length()<w) s="0"+s;
+  return s;
+}
+unsigned int hexToDec(String hex){
+  unsigned int v=0;
+  for(char c:hex){
+    int d = isdigit(c)?c-'0'
+          : isupper(c)?c-'A'+10
+          : islower(c)?c-'a'+10:0;
+    v = v*16 + d;
+  }
+  return v;
+}
+void SendMQTTMessage(){
+  if(!mqttClient.connected()) return;
+  int t2=int(fHRVTemp*2+0.5);
+  fHRVTemp=t2/2.0;
+  pubString=String(fHRVTemp);
+  pubString.toCharArray(message_buff,pubString.length()+1);
+  if(eTempLoc==HRVHOUSE && fHRVTemp!=fHRVLastHouse){
+    fHRVLastHouse=fHRVTemp;
+    mqttClient.publish(HASSIOHRVSUBHOUSE,message_buff);
+  } else if(eTempLoc==HRVROOF && fHRVTemp!=fHRVLastRoof){
+    fHRVLastRoof=fHRVTemp;
+    mqttClient.publish(HASSIOHRVSUBROOF,message_buff);
+  }
+  if(iHRVControlTemp!=iHRVLastControl){
+    pubString=String(iHRVControlTemp);
+    pubString.toCharArray(message_buff,pubString.length()+1);
+    iHRVLastControl=iHRVControlTemp;
+    mqttClient.publish(HASSIOHRVSUBCONTROL,message_buff);
+  }
+  if(iHRVFanSpeed!=iHRVLastFanSpeed){
+    iHRVLastFanSpeed=iHRVFanSpeed;
+    if(iHRVFanSpeed==0)      pubString="Off";
+    else if(iHRVFanSpeed==5) pubString="Idle";
+    else if(iHRVFanSpeed==100)pubString="Full";
+    else                     pubString=String(iHRVFanSpeed)+"%";
+    pubString.toCharArray(message_buff,pubString.length()+1);
+    mqttClient.publish(HASSIOHRVSUBFANSPEED,message_buff);
+  }
+  digitalWrite(LED_BUILTIN,LOW); delay(50);
+  digitalWrite(LED_BUILTIN,HIGH);delay(200);
+}
+void myDelay(int ms){
+  for(int i=0;i<ms;i++){
+    delay(1);
+    if((i&0x3F)==0) mqttClient.loop();
+  }
+  iTotalDelay+=ms;
+}
+void startWIFI(){
+  if(WiFi.status()==WL_CONNECTED) return;
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  WiFi.begin(ssid,password);
+  int tries=0;
+  while(WiFi.status()!=WL_CONNECTED){
+    delay(2000);
+    if(++tries>450) ESP.reset();
+  }
+  delay(500);
+}
