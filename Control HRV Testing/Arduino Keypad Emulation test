@@ -1,0 +1,273 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <SoftwareSerial.h>
+#include <ESP8266WebServer.h>
+#include <ctype.h>  // isxdigit()
+
+// ─── HRV constants ──────────────────────────────────────────────────────────
+#define MSGSTARTSTOP     0x7E
+#define HRVROOF          0x30
+#define HRVHOUSE         0x31
+#define HRVHUMIDITY_PKT  0x37
+#define HRVFILTER_PKT    0x07
+#define HRVENT_PKT       0x05
+#define HRVKWH_PKT       0x06
+#define HRVVER_PKT       0x01
+
+// ─── MQTT topics ────────────────────────────────────────────────────────────
+#define T_STATUS       "hassio/hrv/status"
+#define T_RAW          "hassio/hrv/raw"
+#define T_HOUSE        "hassio/hrv/housetemp"
+#define T_ROOF         "hassio/hrv/rooftemp"
+#define T_CTRL         "hassio/hrv/controltemp"
+#define T_FAN          "hassio/hrv/fanspeed"
+#define T_HUM_RAW      "hassio/hrv/humidity_raw"
+#define T_HUM          "hassio/hrv/humidity"
+#define T_FILTER       "hassio/hrv/filter_life"
+#define T_VENT         "hassio/hrv/ventilation_level"
+#define T_KWH          "hassio/hrv/kwh_saved"
+#define T_MODEL        "hassio/hrv/version/model"
+#define T_FW           "hassio/hrv/version/fw"
+#define T_FLAGS_RAW    "hassio/hrv/flags_raw"
+#define T_FLAGS_DEC    "hassio/hrv/flags_dec"
+#define T_FLAGS_BIN    "hassio/hrv/flags_bin"
+#define T_FLAG_BIT     "hassio/hrv/flag/bit" 
+#define T_MANUAL       "hassio/hrv/manual"
+
+// ─── Wi-Fi & MQTT creds ─────────────────────────────────────────────────────
+const char* ssid     = "Reaver";
+const char* pass     = "FigjamDilligaf74";
+IPAddress   mqttSrv(192,168,1,44);
+const char* mqttUser= "mqtt";
+const char* mqttPass= "Justj33p";
+
+// ─── HRV bus on D2=RX, D1=TX ────────────────────────────────────────────────
+SoftwareSerial hrvSerial(D2, D1);
+
+// ─── Networking & MQTT & WebServer ────────────────────────────────────────
+WiFiClient       net;
+PubSubClient     mqtt(net);
+ESP8266WebServer http(80);
+
+// ─── Frame parsing & keypad emulation ─────────────────────────────────────
+bool    inFrame = false;
+uint8_t frameBuf[16];
+size_t  frameLen = 0;
+
+const uint8_t frameA[] = {0x7E,0x30,0x00,0xC2,0x00,0x0E,0x7E};
+uint8_t       frameB[16];
+size_t       frameBLen;
+
+const uint8_t defaultB[] = {0x7E,0x31,0x01,0x4E,0x21,0x1A,0x84,0x70,0x51,0x7E};
+
+const uint8_t startup1[] = {0x7E,0x46,0x00,0x00,0x00,0xBA,0x7E};
+const uint8_t startup2[] = {0x7E,0x37,0x01,0x56,0x00,0x1D,0x84,0xD1,0x7E};
+const uint8_t startup3[] = {0x7E,0x36,0x00,0x00,0x00,0xCA,0x7E};
+
+// ─── Web UI log buffer ─────────────────────────────────────────────────────
+#define LOG_SZ  50
+String  logbuf[LOG_SZ];
+int     logCnt=0;
+void addLog(const String &l){
+  if(logCnt<LOG_SZ) logbuf[logCnt++]=l;
+  else {
+    for(int i=1;i<LOG_SZ;i++) logbuf[i-1]=logbuf[i];
+    logbuf[LOG_SZ-1]=l;
+  }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+String hexLine(const uint8_t *b, size_t l){
+  String s; char t[4];
+  for(size_t i=0;i<l;i++){
+    sprintf(t,"%02X ",b[i]);
+    s += t;
+  }
+  return s;
+}
+void pstr(const char*t, const String &v){
+  mqtt.publish(t,v.c_str());
+}
+
+// ─── Handle a full 7E…7E packet ───────────────────────────────────────────
+void handlePacket(const uint8_t *p, size_t len){
+  String hx = hexLine(p,len);
+  pstr(T_RAW,hx);
+  addLog("RX: "+hx);
+
+  uint8_t loc = p[1];
+  uint16_t rawT= (uint16_t(p[2])<<8)|p[3];
+  float    tmp = rawT*0.0625;
+
+  switch(loc){
+    case HRVHOUSE: {
+      uint8_t fan=p[4], ctrl=p[5];
+      pstr(T_FAN,  String(fan));
+      pstr(T_CTRL, String(ctrl));
+      pstr(T_HOUSE,String(tmp));
+    } break;
+    case HRVROOF:
+      pstr(T_ROOF,String(tmp));
+      break;
+    case HRVHUMIDITY_PKT:
+      pstr(T_HUM_RAW,String(p[3]));
+      pstr(T_HUM,    String(p[3]*100.0/144.0,1));
+      break;
+    case HRVFILTER_PKT:
+      pstr(T_FILTER,String(p[3]*100.0/255.0,1));
+      break;
+    case HRVENT_PKT:
+      pstr(T_VENT,String(p[3]));
+      break;
+    case HRVKWH_PKT:
+      pstr(T_KWH,String(p[3]));
+      break;
+    case HRVVER_PKT:
+      pstr(T_MODEL,String(p[3],HEX));
+      pstr(T_FW,   String(p[4],HEX));
+      break;
+  }
+
+  // flags
+  uint8_t flags=p[6];
+  pstr(T_FLAGS_RAW, String(flags,HEX));
+  pstr(T_FLAGS_DEC, String(flags));
+  { String b; for(int i=7;i>=0;i--) b+=((flags>>i)&1)?'1':'0';
+    pstr(T_FLAGS_BIN,b);
+  }
+  for(int i=0;i<8;i++){
+    char top[32];
+    sprintf(top,"%s%d",T_FLAG_BIT,i);
+    pstr(top,String((flags>>i)&1));
+  }
+}
+
+// ─── MQTT callback → set custom Frame B & inject immediately ─────────────
+void mqttCallback(char*topic, byte*payload, unsigned int len){
+  String ascii;
+  for(unsigned int i=0;i<len;i++) ascii+=(char)payload[i];
+  ascii.trim();
+  addLog("CMD<- "+ascii);
+
+  // parse two‐hex‐chars into frameB
+  size_t idx=0; char buf[3]={0,0,0};
+  for(size_t i=0;i+1<ascii.length() && idx<sizeof(frameB);){
+    char c0=ascii[i], c1=ascii[i+1];
+    if(isxdigit(c0)&&isxdigit(c1)){
+      buf[0]=c0; buf[1]=c1;
+      frameB[idx++]= strtol(buf,NULL,16);
+      i+=2;
+    } else i++;
+  }
+  frameBLen=idx;
+  // enforce 0x7E start & end
+  if(frameBLen<2 || frameB[0]!=0x7E || frameB[frameBLen-1]!=0x7E){
+    memcpy(frameB,defaultB,sizeof defaultB);
+    frameBLen=sizeof defaultB;
+  }
+  // immediate inject
+  hrvSerial.write(frameB,frameBLen);
+  String hx=hexLine(frameB,frameBLen);
+  addLog("TX MNL: "+hx);
+  Serial.print("TX MNL: "); Serial.println(hx);
+}
+
+// ─── Serve Web UI ─────────────────────────────────────────────────────────
+void handleRoot(){
+  String html="<html><head><title>HRV Sniffer</title></head><body>";
+  html+="<h3>Last RX/TX</h3><pre>";
+  for(int i=0;i<logCnt;i++) html+=logbuf[i]+"\n";
+  html+="</pre></body></html>";
+  http.send(200,"text/html",html);
+}
+
+void sendStartup(){
+  // mimic keypad on power-up
+  for(auto b: {startup1, startup2, startup3}){
+    size_t L = (b==startup2?sizeof startup2
+              : b==startup3?sizeof startup3
+                            :sizeof startup1);
+    hrvSerial.write(b,L);
+    Serial.print("TX ST: "); Serial.println(hexLine(b,L));
+    delay(100);
+  }
+}
+
+void setup(){
+  Serial.begin(115200);
+  hrvSerial.begin(1200);
+  pinMode(LED_BUILTIN,OUTPUT);
+
+  // default Frame B
+  memcpy(frameB, defaultB, sizeof defaultB);
+  frameBLen = sizeof defaultB;
+
+  // Wi-Fi
+  WiFi.begin(ssid,pass);
+  while(WiFi.status()!=WL_CONNECTED){
+    delay(200); Serial.print('.');
+  }
+  Serial.println("\nWi-Fi "+WiFi.localIP().toString());
+
+  // MQTT
+  mqtt.setServer(mqttSrv,1883);
+  mqtt.setCallback(mqttCallback);
+  String cid="hrv-"+WiFi.macAddress();
+  while(!mqtt.connected()){
+    if(mqtt.connect(cid.c_str(),mqttUser,mqttPass)){
+      mqtt.subscribe(T_MANUAL);
+      Serial.println("MQTT up");
+    } else {
+      Serial.printf("MQTT fail %d\n",mqtt.state());
+      delay(2000);
+    }
+  }
+
+  // Web UI
+  http.on("/", handleRoot);
+  http.begin();
+
+  // keypad startup
+  sendStartup();
+}
+
+unsigned long lastPoll=0, lastPing=0;
+void loop(){
+  unsigned long now=millis();
+  mqtt.loop();
+  http.handleClient();
+
+  // 1 Hz polling (A then B)
+  if(now-lastPoll>1000){
+    lastPoll=now;
+    hrvSerial.write(frameA,sizeof frameA);
+    addLog("TX A: "+hexLine(frameA,sizeof frameA));
+    hrvSerial.write(frameB,frameBLen);
+    addLog("TX B: "+hexLine(frameB,frameBLen));
+  }
+
+  // sniff for frames
+  while(hrvSerial.available()){
+    uint8_t c=hrvSerial.read();
+    digitalWrite(LED_BUILTIN,hrvSerial.available()?HIGH:LOW);
+    if(c==MSGSTARTSTOP){
+      if(!inFrame){
+        inFrame=true; frameLen=0;
+      }
+      frameBuf[frameLen++]=c;
+      if(inFrame && frameLen>1){
+        handlePacket(frameBuf,frameLen);
+        inFrame=false;
+        frameLen=0;
+      }
+    } else if(inFrame && frameLen<sizeof frameBuf){
+      frameBuf[frameLen++]=c;
+    }
+  }
+
+  // keep-alive
+  if(now-lastPing>30000){
+    lastPing=now;
+    mqtt.publish(T_STATUS,"1");
+  }
+}
