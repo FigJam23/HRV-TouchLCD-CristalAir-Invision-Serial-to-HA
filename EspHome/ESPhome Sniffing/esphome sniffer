@@ -1,0 +1,125 @@
+external_components:
+  - source:
+      type: local
+      path: components
+
+esphome:
+  name: hrv-sniffer
+  friendly_name: "HRV Sniffer"
+  includes:
+    - raw_sniffer/raw_sniffer.h
+  libraries:
+    - ESP8266WiFi
+    - ESP8266WebServer
+  on_boot:
+    - priority: 600
+      then:
+        - lambda: |-
+            App.register_component(new RawSniffer());
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.17
+    gateway:    192.168.1.1
+    subnet:     255.255.255.0
+  power_save_mode: none
+  fast_connect:    true
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "Justj33p"
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+ota:
+  platform: esphome
+    
+  password: "283355a588a90db0f31782330ad9f820"
+
+# UART sniffer on D2/TX on D1 at 1200 baud
+uart:
+  id: hrv_uart
+  rx_pin: D2
+  tx_pin: D1
+  baud_rate: 1200
+  debug:
+    direction: RX
+    dummy_receiver: true
+    after:
+      timeout: 50ms
+    sequence:
+      - lambda: |-
+          static bool in_frame = false;
+          static std::vector<uint8_t> buf;
+          for (auto b : bytes) {
+            if (b == 0x7E) {
+              if (!in_frame) {
+                // start of frame
+                in_frame = true;
+                buf.clear();
+                buf.push_back(b);
+              } else {
+                // end of frame marker
+                buf.push_back(b);
+                // only process if payload present
+                if (buf.size() > 2) {
+                  // build hex string for this frame
+                  std::string hex;
+                  for (auto x : buf) {
+                    char hstr[4];
+                    snprintf(hstr, sizeof(hstr), "%02X ", x);
+                    hex += hstr;
+                  }
+                  // append newline
+                  hex += "\n";
+
+                  // classify and append
+                  auto &a = id(frame_a_buf);
+                  auto &c = id(frame_b_buf);
+                  auto &u = id(frame_unknown_buf);
+                  if (buf[1] == 0x31 && buf[2] == 0x01) {
+                    a += hex;
+                    if (a.length() > id(max_raw_chars))
+                      a = a.substr(a.length() - id(max_raw_chars));
+                  } else if (buf[1] == 0x30 && buf[2] == 0x00) {
+                    c += hex;
+                    if (c.length() > id(max_raw_chars))
+                      c = c.substr(c.length() - id(max_raw_chars));
+                  } else {
+                    u += hex;
+                    if (u.length() > id(max_raw_chars))
+                      u = u.substr(u.length() - id(max_raw_chars));
+                  }
+                }
+                // reset for next frame
+                in_frame = false;
+                buf.clear();
+              }
+            } else if (in_frame) {
+              buf.push_back(b);
+            }
+          }
+
+globals:
+  - id: frame_a_buf
+    type: std::string
+    restore_value: no
+    initial_value: ""
+  - id: frame_b_buf
+    type: std::string
+    restore_value: no
+    initial_value: ""
+  - id: frame_unknown_buf
+    type: std::string
+    restore_value: no
+    initial_value: ""
+  - id: max_raw_chars
+    type: int
+    restore_value: no
+    initial_value: "20000"
