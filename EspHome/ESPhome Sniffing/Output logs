@@ -1,4 +1,4 @@
-###### HRV Sniffer #######
+8###### HRV Sniffer #######
 
 
 Frame A (7E 31 01 …)
@@ -58,7 +58,7 @@ Frame A (7E 31 01 …)
 7E 30 00 D1 00 FF 7E 
 
 #####Unknown#####
-
+# unsure on this one ( 1E FE F8 E6 1E 06 FE 9E 00 F8 60 80)
 7E 37 01 6C 00 1E 84 BA 7E 
 7E 37 01 6C 00 1E 84 BA 7E 
 7E 41 E3 DC 7E 
