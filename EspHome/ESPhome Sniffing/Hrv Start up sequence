@@ -1,3 +1,15 @@
+
+Mimic the Keypad Boot Sequence Exactly:
+
+Step	Send From Your ESP (keypad)	Description
+
+1	7E 37 01 71 00 1E 84 B5 7E	Send twice — this is the keypad hello
+2	Wait for response (expect): 7E 41 E3 DC 7E	ACK from controller (comes 4×)
+3	Send: 7E 38 00 00 00 C8 7E	Config/status (4×)
+4	Wait for more frames like 42, 46, 34, etc.	These you can log and eventually emulate
+###№############№#############################################################################
+
+
 Packet	Count	Notes
 
 7E 37 01 71 00 1E 84 B5 7E	2	Likely startup request/init
