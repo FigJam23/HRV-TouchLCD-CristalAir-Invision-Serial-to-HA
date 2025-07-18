@@ -1,1 +1,149 @@
+input_number:
+  hrv_ack_counter:
+    name: HRV ACK Counter
+    min: 0
+    max: 4
+    step: 1
+    initial: 0
+
+automation:
+  - alias: “Count HRV ACK frames”
+    trigger:
+      platform: mqtt
+      topic: tele/hrv_keypad/RESULT
+    condition:
+      condition: template
+      # only until we’ve seen 4
+      value_template: "{{ states('input_number.hrv_ack_counter') | int < 4 }}"
+    action:
+      - choose:
+          - conditions:
+              # look for the exact ACK bytes in the Tasmota console payload
+              condition: template
+              value_template: >
+                {{ '41 E3 DC' in trigger.payload }}
+            sequence:
+              - service: input_number.set_value
+                data:
+                  entity_id: input_number.hrv_ack_counter
+                  value: "{{ states('input_number.hrv_ack_counter')|int + 1 }}"
+
+
+    script:
+  hrv_keypad_boot:
+    alias: “HRV Keypad Handshake”
+    sequence:
+      # 0) reset ACK counter
+      - service: input_number.set_value
+        data:
+          entity_id: input_number.hrv_ack_counter
+          value: 0
+
+      # 1) send HELLO twice (50 ms apart)
+      - service: mqtt.publish
+        data:
+          topic: cmnd/hrv_keypad/SerialSend1
+          payload: "7E370171001E84B57E"
+      - delay: "00:00:00.050"
+      - service: mqtt.publish
+        data:
+          topic: cmnd/hrv_keypad/SerialSend1
+          payload: "7E370171001E84B57E"
+
+      # 2) wait for 4 ACKs (timeout 10 s to fail safe)
+      - wait_for_trigger:
+          - platform: state
+            entity_id: input_number.hrv_ack_counter
+            to: "4"
+        timeout: "00:00:10"
+        continue_on_timeout: false
+
+      # 3) send ZERO packet 4× (50 ms apart)
+      - repeat:
+          count: 4
+          sequence:
+            - service: mqtt.publish
+              data:
+                topic: cmnd/hrv_keypad/SerialSend1
+                payload: "7E38000000C87E"
+            - delay: "00:00:00.050"
+
+      # 4) done!
+      - service: persistent_notification.create
+        data:
+          title: “HRV Handshake”
+          message: “Handshake complete—now in RUNNING mode.”
+
+
+automation:
+  - alias: “Run HRV Handshake on Startup”
+    trigger:
+      platform: homeassistant
+      event: start
+    action:
+      - service: script.hrv_keypad_boot
+
+
+
+automation:
+  - alias: “HRV Poll Every Minute”
+    trigger:
+      platform: time_pattern
+      minutes: "/1"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: cmnd/hrv_keypad/SerialSend1
+          payload: "7E31016D001E84704F7E"
+
+
+
+sensor:
+  - platform: mqtt
+    name: “HRV House Temperature”
+    state_topic: “tele/hrv_keypad/RESULT”
+    unit_of_measurement: “°C”
+    value_template: >-
+      {% set parts = value.split(' ') %}
+      {% if '31' in parts and '01' in parts %}
+        {# find the index of the 0x31 0x01 pattern #}
+        {% set i = parts.index('31') %}
+        {% set raw = (parts[i+1]|int(base=16)) * 256 + (parts[i+2]|int(base=16)) %}
+        {{ (raw * 0.0625) | round(1) }}
+      {% else %}
+        {{ states('sensor.hrv_house_temperature') }}
+      {% endif %}
+
+- platform: mqtt
+    name: “HRV Fan Speed”
+    state_topic: “tele/hrv_keypad/RESULT”
+    value_template: >-
+      {% set p = value.split(' ') %}
+      {% if '31' in p and '01' in p %}
+        {% set idx = p.index('31') %}
+        {% set fan = p[idx+3]|int(base=16) %}
+        {% if fan == 0 %}Off
+        {% elif fan == 5 %}Idle
+        {% elif fan == 100 %}Full
+        {% else %}{{ fan }}%{% endif %}
+      {% else %}
+        {{ states('sensor.hrv_fan_speed') }}
+      {% endif %}
+
+
+
+- platform: mqtt
+    name: “HRV Roof Temperature”
+    state_topic: “tele/hrv_keypad/RESULT”
+    unit_of_measurement: “°C”
+    value_template: >-
+      {% set p = value.split(' ') %}
+      {% if '30' in p and '00' in p %}
+        {% set idx = p.index('30') %}
+        {% set raw = (p[idx+1]|int(base=16))*256 + (p[idx+2]|int(base=16)) %}
+        {{ (raw * 0.0625) | round(1) }}
+      {% else %}
+        {{ states('sensor.hrv_roof_temperature') }}
+      {% endif %}
+
 
