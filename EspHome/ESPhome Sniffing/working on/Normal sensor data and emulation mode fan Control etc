@@ -67,7 +67,6 @@ uart:
 
 # ───────── Globals ─────────
 globals:
-  # Last decoded real values
   - id: last_house_temp
     type: float
     initial_value: "255"
@@ -87,7 +86,6 @@ globals:
     type: uint32_t
     initial_value: "0"
 
-  # Time each sensor last updated (millis)
   - id: ts_house
     type: uint32_t
     initial_value: "0"
@@ -101,13 +99,12 @@ globals:
     type: uint32_t
     initial_value: "0"
 
-  # Emulation mode / state machine
   - id: emulation_active
     type: bool
     initial_value: "false"
   - id: emulate_phase
     type: uint8_t
-    initial_value: "0"        # 0 idle, 1 boot burst, 2 periodic
+    initial_value: "0"
   - id: emulate_index
     type: int
     initial_value: "0"
@@ -115,18 +112,16 @@ globals:
     type: uint32_t
     initial_value: "0"
 
-  # Desired outputs while emulating
   - id: desired_fan_speed
     type: int
-    initial_value: "10"        # start 10%
+    initial_value: "10"
   - id: desired_setpoint
     type: int
-    initial_value: "30"
+    initial_value: "22"
   - id: emulate_temp_c
     type: float
     initial_value: "22.5"
 
-  # Remember last emulated sent values to avoid spamming identical frames
   - id: last_emul_sent_fan
     type: int
     initial_value: "-1"
@@ -137,12 +132,18 @@ globals:
     type: float
     initial_value: "-1000"
 
-  # Sensor timeout ms (after which we zero values in normal mode)
   - id: sensor_timeout_ms
     type: uint32_t
     initial_value: "15000"
 
-# ───────── Sensors (template) ─────────
+  - id: keypad_online_state
+    type: bool
+    initial_value: "false"
+  - id: controller_online_state
+    type: bool
+    initial_value: "false"
+
+# ───────── Sensors ─────────
 sensor:
   - platform: template
     name: "HRV House Temp"
@@ -175,20 +176,21 @@ sensor:
     id: hrv_wifi_signal
     update_interval: 30s
 
-# Optional number to adjust setpoint while emulating
 number:
   - platform: template
     name: "HRV Emu Setpoint"
     id: hrv_emu_setpoint
     optimistic: true
-    min_value: 10
-    max_value: 40
+    min_value: 14
+    max_value: 30
     step: 1
     unit_of_measurement: "°C"
     set_action:
       - lambda: |-
-          id(desired_setpoint) = int(x);
-          ESP_LOGI("hrv_emul","Desired setpoint -> %d", id(desired_setpoint));
+          int v = (int)x;
+          v = std::max(14,std::min(30,v));
+          id(desired_setpoint)=v;
+          ESP_LOGI("hrv_emul","Desired setpoint -> %d", v);
 
 text_sensor:
   - platform: template
@@ -197,6 +199,18 @@ text_sensor:
   - platform: template
     name: "HRV Raw Frame"
     id: hrv_raw_frame
+
+binary_sensor:
+  - platform: template
+    name: "HRV Keypad Online"
+    id: hrv_keypad_online
+    lambda: |-
+      return id(keypad_online_state);
+  - platform: template
+    name: "HRV Controller Online"
+    id: hrv_controller_online
+    lambda: |-
+      return id(controller_online_state);
 
 # ───────── Emulation / Fan Speed Switches ─────────
 switch:
@@ -213,11 +227,11 @@ switch:
             id(emulate_phase)=1;
             id(emulate_index)=0;
             id(last_emulate_ms)=millis();
-            // Seed sensors immediately
             id(hrv_house_temp).publish_state(id(emulate_temp_c));
             id(hrv_setpoint).publish_state(id(desired_setpoint));
             id(hrv_fan_speed).publish_state(id(desired_fan_speed));
-            id(hrv_fan_mode).publish_state((id(desired_fan_speed)==0)?"Off": (std::to_string(id(desired_fan_speed)) + "%").c_str());
+            std::string mode=(id(desired_fan_speed)==0)?"Off":std::to_string(id(desired_fan_speed))+"%";
+            id(hrv_fan_mode).publish_state(mode.c_str());
           }
     turn_off_action:
       - lambda: |-
@@ -268,89 +282,71 @@ switch:
           id(desired_fan_speed)=100;
           ESP_LOGI("hrv_emul","Fan target 100%%");
 
-# ───────── Helper Scripts ─────────
+# ───────── Scripts ─────────
 script:
-  # Send arbitrary hex string
   - id: send_hex_string
-    parameters:
-      hex: string
+    parameters: { hex: string }
     then:
       - lambda: |-
-          std::string s = hex;
-          std::string comp;
+          std::string s=hex, comp;
           for(char c: s) if(!isspace((unsigned char)c)) comp+=c;
           if(comp.size()%2){ ESP_LOGW("hrv_send","Odd hex (%s)", comp.c_str()); return; }
-          for(size_t i=0;i<comp.size(); i+=2){
-            uint8_t v = strtol(comp.substr(i,2).c_str(), nullptr, 16);
+          for(size_t i=0;i<comp.size();i+=2){
+            uint8_t v=strtol(comp.substr(i,2).c_str(), nullptr, 16);
             id(hrv_uart).write_byte(v);
             delay(7);
           }
 
-  # Construct and send a dynamic "house status" frame when emulating
+  # Build correct *real-format* house frame:
+  # 7E 31 01 TH TL FAN SETP 84 70 CHK 7E   (NOTE: real frames show 1E 84 70;
+  # if 0x1E is *always* setpoint, we set it dynamically; constants now 0x84,0x70)
   - id: send_house_status_frame
     then:
       - lambda: |-
-          // House frame format we inferred: 7E 31 01 TT TT FAN SETP 1E 84 70 CC 7E (example pattern)
-          // We will mimic similar length to real frames: 7E 31 01 <tempHi> <tempLo> <fan> <setp> 1E 84 70 <cksum> 7E
-          // temp raw = °C / 0.0625  (we round to nearest whole raw)
-          float t = id(emulate_temp_c);
-          // fallback to last real if plausible
-            if(id(last_house_temp) < 200 && !isnan(id(last_house_temp))) t = id(last_house_temp);
-          uint16_t rawT = (uint16_t)(t / 0.0625f + 0.5f);
-          uint8_t th = (rawT >> 8) & 0xFF;
-          uint8_t tl = rawT & 0xFF;
-          uint8_t fan = (uint8_t) std::max(0,std::min(100,id(desired_fan_speed)));
-          uint8_t setp = (uint8_t) std::max(0,std::min(100,id(desired_setpoint)));
-          // constant trailer bytes we kept seeing: 1E 84 70
-          uint8_t const1=0x1E, const2=0x84, const3=0x70;
+          // Determine temperature to send (clamped)
+          float t = (id(last_house_temp)<200 && id(last_house_temp)>=0)?id(last_house_temp):id(emulate_temp_c);
+          if(t<0) t=0; if(t>45) t=45;
+          uint16_t rawT=(uint16_t)(t/0.0625f + 0.5f);
+          uint8_t th=rawT>>8, tl=rawT&0xFF;
 
-          uint8_t frame[11];
+          int fan_i = std::max(0,std::min(100,id(desired_fan_speed)));
+          int setp_i = std::max(14,std::min(30,id(desired_setpoint)));
+
+          uint8_t frame[10];
           frame[0]=0x7E;
           frame[1]=0x31;
           frame[2]=0x01;
           frame[3]=th;
           frame[4]=tl;
-          frame[5]=fan;
-          frame[6]=setp;
-          frame[7]=const1;
-          frame[8]=const2;
-          frame[9]=const3;
-
-          // Checksum rule we used earlier: negative sum of bytes 1..(n-2)
+          frame[5]=(uint8_t)fan_i;
+          frame[6]=(uint8_t)setp_i;
+          frame[7]=0x84;
+          frame[8]=0x70;
+          // checksum over bytes 1..8 (negative sum)
           int sum=0;
-          for(int i=1;i<=9;i++) sum -= frame[i];
+          for(int i=1;i<=8;i++) sum -= frame[i];
           uint8_t cks = (uint8_t)(sum & 0xFF);
-          frame[10]=cks;
-
-          // Send
-          for(int i=0;i<11;i++){
-            id(hrv_uart).write_byte(frame[i]);
-            delay(2);
-          }
-          // End marker second 7E? (Original frames already start & end with 7E; here we built one with single 7E at start.
-          // Real frames: start 7E ... data ... checksum ... 7E end. Add end marker separately.
+          // Send out: frame[0..8], checksum, end 0x7E
+          for(int i=0;i<9;i++){ id(hrv_uart).write_byte(frame[i]); delay(2); }
+          id(hrv_uart).write_byte(cks);
           id(hrv_uart).write_byte(0x7E);
 
-          // Publish sensors directly (so even if we ignore our own frame parse we get updates)
+          // Update sensors immediately
           id(hrv_house_temp).publish_state(t);
-          id(hrv_fan_speed).publish_state(fan);
-          id(hrv_setpoint).publish_state(setp);
-          std::string mode = (fan==0)?"Off":(fan==5)?"Idle":(fan==100)?"Full":(std::to_string(fan)+"%");
+          id(hrv_fan_speed).publish_state(fan_i);
+          id(hrv_setpoint).publish_state(setp_i);
+          std::string mode=(fan_i==0)?"Off":(fan_i==5)?"Idle":(fan_i==100)?"Full":(std::to_string(fan_i)+"%");
           id(hrv_fan_mode).publish_state(mode.c_str());
+          id(last_emul_sent_fan)=fan_i;
+          id(last_emul_sent_setp)=setp_i;
+          id(last_emul_sent_temp)=t;
 
-          // MQTT manual publish to keep HA in sync promptly
-          id(hrv_mqtt).publish("housetemp", String(t).c_str());
-          id(hrv_mqtt).publish("controltemp", String(setp).c_str());
-          id(hrv_mqtt).publish("fanspeed", mode.c_str());
-
-  # Emulation tick (boot sequence + periodic dynamic)
   - id: emulate_tick
     then:
       - lambda: |-
           if(!id(emulation_active)) return;
-          uint32_t now = millis();
-
-          static const char* BOOT_FRAMES[] = {
+          uint32_t now=millis();
+          static const char* BOOT_FRAMES[]={
             "7E 37 01 6C 00 1E 84 BA 7E","7E 37 01 6C 00 1E 84 BA 7E",
             "7E 41 E3 DC 7E","7E 41 E3 DC 7E","7E 41 E3 DC 7E","7E 41 E3 DC 7E",
             "7E 38 00 00 00 C8 7E","7E 38 00 00 00 C8 7E","7E 38 00 00 00 C8 7E","7E 38 00 00 00 C8 7E",
@@ -361,10 +357,10 @@ script:
             "7E 43 C3 FA 7E","7E 43 C3 FA 7E","7E 43 C3 FA 7E","7E 43 C3 FA 7E",
             "7E 35 83 48 7E","7E 35 83 48 7E","7E 35 83 48 7E","7E 35 83 48 7E"
           };
-          const int BOOT_LEN = sizeof(BOOT_FRAMES)/sizeof(BOOT_FRAMES[0]);
+          const int BLEN = sizeof(BOOT_FRAMES)/sizeof(BOOT_FRAMES[0]);
 
           if(id(emulate_phase)==1){
-            if(id(emulate_index) < BOOT_LEN){
+            if(id(emulate_index)<BLEN){
               if(now - id(last_emulate_ms) > 120){
                 id(last_emulate_ms)=now;
                 id(send_hex_string).execute(std::string(BOOT_FRAMES[id(emulate_index)]));
@@ -379,53 +375,45 @@ script:
           }
 
           if(id(emulate_phase)==2){
-            // At least every 1000 ms; earlier if changes
             bool timer_elapsed = (now - id(last_emulate_ms)) > 1000;
-            int fan = id(desired_fan_speed);
-            int setp = id(desired_setpoint);
-            float temp = (id(last_house_temp)<200)?id(last_house_temp):id(emulate_temp_c);
-
-            bool changed = (fan != id(last_emul_sent_fan)) ||
-                           (setp != id(last_emul_sent_setp)) ||
-                           (fabsf(temp - id(last_emul_sent_temp)) >= 0.5f);
-
-            // Force send at least every 10s even if no change
+            int fan = std::max(0,std::min(100,id(desired_fan_speed)));
+            int setp = std::max(14,std::min(30,id(desired_setpoint)));
+            float temp = (id(last_house_temp)<200 && id(last_house_temp)>=0)?id(last_house_temp):id(emulate_temp_c);
+            if(temp<0) temp=0; if(temp>45) temp=45;
+            bool changed = (fan!=id(last_emul_sent_fan)) ||
+                           (setp!=id(last_emul_sent_setp)) ||
+                           (fabsf(temp-id(last_emul_sent_temp))>=0.5f);
             bool force_refresh = (now - id(last_emulate_ms)) > 10000;
-
             if(timer_elapsed && (changed || force_refresh)){
               id(last_emulate_ms)=now;
               id(send_house_status_frame).execute();
-              id(last_emul_sent_fan)=fan;
-              id(last_emul_sent_setp)=setp;
-              id(last_emul_sent_temp)=temp;
             }
           }
 
-  # UART frame processor (ignored in emulation mode unless you want to watch bus)
   - id: hrv_process_uart
     then:
       - lambda: |-
           if(id(emulation_active)){
-            // In emulation we ignore external frames (prevents overwriting simulated state)
             while(id(hrv_uart).available()){
               uint8_t dump; id(hrv_uart).read_byte(&dump);
             }
             return;
           }
-
           static std::vector<uint8_t> frame;
+
           auto publish_fan_mode = [&](int raw){
             std::string mode;
             if(raw==0) mode="Off";
             else if(raw==5) mode="Idle";
             else if(raw==100) mode="Full";
-            else mode = std::to_string(raw)+"%";
+            else mode=std::to_string(raw)+"%";
             id(hrv_fan_mode).publish_state(mode.c_str());
           };
 
           while(id(hrv_uart).available()){
             uint8_t b=0; id(hrv_uart).read_byte(&b);
             id(last_activity)=millis();
+
             if(frame.empty()){
               if(b==0x7E) frame.push_back(b);
               continue;
@@ -433,54 +421,57 @@ script:
             frame.push_back(b);
 
             if(b==0x7E && frame.size()>=5){
-              // Build hex output
+              // Build hex string
               std::string hex; char h[4];
-              for(auto v: frame){ snprintf(h,sizeof(h),"%02X ",v); hex += h; }
+              for(auto v:frame){ snprintf(h,sizeof(h),"%02X ",v); hex+=h; }
               if(!hex.empty()) hex.pop_back();
               id(hrv_raw_frame).publish_state(hex.c_str());
 
-              if(frame.size()<=16 && frame.size()>=6){
-                size_t cks_idx = frame.size()-2;
-                if(cks_idx>1){
+              // Expected lengths: 10 bytes (house), maybe 7 bytes (roof) etc.
+              size_t sz = frame.size();
+              if(sz >= 7){  // minimal for checksum logic
+                size_t cks_idx = sz - 2;
+                if(cks_idx > 1){
                   int sum=0;
                   for(size_t i=1;i<cks_idx;i++) sum -= frame[i];
-                  uint8_t calc = uint8_t(sum & 0xFF);
+                  uint8_t calc = (uint8_t)(sum & 0xFF);
                   uint8_t expect = frame[cks_idx];
-                  if(calc==expect){
+                  if(calc == expect){
                     uint8_t type = frame[1];
-                    if(type==0x31){ // house frame
-                      if(frame.size()>=8){
-                        uint16_t rawT = (uint16_t(frame[2])<<8)|frame[3];
-                        float temp = rawT*0.0625f;
+                    if(type == 0x31 && sz==10){
+                      // Indexes: 0:7E 1:31 2:01 3:tempH 4:tempL 5:fan 6:setp 7:84 8:70 9:7E(end) with checksum at index 8? (actually checksum at index 8 in real sample preceding last 7E)
+                      // Our collected sample: 7E 31 01 6C 04 1E 84 70 4C 7E
+                      // Here checksum is index 8 (0x4C). So layout:
+                      // 0 start, 1 loc, 2 tempH, 3 tempL, 4 fan, 5 setp, 6 const 0x84, 7 const 0x70, 8 checksum, 9 end.
+                      uint16_t rawT = (uint16_t(frame[2])<<8) | frame[3];
+                      float temp = rawT * 0.0625f;
+                      if(temp>=0 && temp<=45){
                         int t2 = int(temp*2+0.5f); temp = t2/2.0f;
-                        if(temp < 200){
-                          id(last_house_temp)=temp;
-                          id(ts_house)=millis();
-                          id(hrv_house_temp).publish_state(temp);
-                        }
-                        uint8_t fan=frame[5];
-                        uint8_t setp=frame[6];
-                        if(fan != id(last_fan_speed)){
-                          id(last_fan_speed)=fan;
-                          id(ts_fan)=millis();
-                          id(hrv_fan_speed).publish_state(fan);
-                          publish_fan_mode(fan);
-                        }
-                        if(setp != id(last_setpoint)){
-                          id(last_setpoint)=setp;
-                          id(ts_setpoint)=millis();
-                          id(hrv_setpoint).publish_state(setp);
-                        }
+                        id(last_house_temp)=temp;
+                        id(ts_house)=millis();
+                        id(hrv_house_temp).publish_state(temp);
                       }
-                    } else if(type==0x30){ // roof frame (shorter)
-                      if(frame.size()>=7){
-                        // From your data pattern: 7E 30 00 XX 00 YY 7E  (some variations)
-                        // Interpret bytes 2/3 maybe raw temp? We'll decode similar to earlier: bytes 2&3 -> temp
+                      int fan = std::max(0,std::min(100,(int)frame[4]));
+                      if(fan != id(last_fan_speed)){
+                        id(last_fan_speed)=fan;
+                        id(ts_fan)=millis();
+                        id(hrv_fan_speed).publish_state(fan);
+                        publish_fan_mode(fan);
+                      }
+                      int setp = frame[5];
+                      if(setp>=14 && setp<=30 && setp != id(last_setpoint)){
+                        id(last_setpoint)=setp;
+                        id(ts_setpoint)=millis();
+                        id(hrv_setpoint).publish_state(setp);
+                      }
+                    } else if(type == 0x30){
+                      // Roof frame format previously: 7E 30 00 XX 00 YY 7E (varies)
+                      if(sz >= 7){
+                        // Treat bytes 2&3 as raw temp if plausible
                         uint16_t rawT = (uint16_t(frame[2])<<8)|frame[3];
-                        // Some frames show high nibble small; guard unrealistic
-                        if(rawT != 0){
-                          float temp = rawT*0.0625f;
-                          if(temp < 200){
+                        if(rawT){
+                          float temp = rawT * 0.0625f;
+                          if(temp>=0 && temp<=45){
                             int t2=int(temp*2+0.5f); temp=t2/2.0f;
                             id(last_roof_temp)=temp;
                             id(ts_roof)=millis();
@@ -496,37 +487,29 @@ script:
               continue;
             }
 
-            if(frame.size()>24) frame.clear();
+            if(frame.size() > 24) frame.clear();
           }
 
-  # Zero stale sensors in normal mode
   - id: zero_stale_check
     then:
       - lambda: |-
           if(id(emulation_active)) return;
-          uint32_t now = millis();
-          uint32_t to = id(sensor_timeout_ms);
-
-          if(id(last_house_temp)!=255 && (now - id(ts_house) > to)){
+          uint32_t now=millis(), to=id(sensor_timeout_ms);
+          if(id(last_house_temp)!=255 && (now-id(ts_house)>to)){
             ESP_LOGW("hrv","House temp stale -> zero");
-            id(last_house_temp)=0;
-            id(hrv_house_temp).publish_state(0);
+            id(last_house_temp)=0; id(hrv_house_temp).publish_state(0);
           }
-          if(id(last_roof_temp)!=255 && (now - id(ts_roof) > to)){
+          if(id(last_roof_temp)!=255 && (now-id(ts_roof)>to)){
             ESP_LOGW("hrv","Roof temp stale -> zero");
-            id(last_roof_temp)=0;
-            id(hrv_roof_temp).publish_state(0);
+            id(last_roof_temp)=0; id(hrv_roof_temp).publish_state(0);
           }
-            if(id(last_fan_speed)!=255 && (now - id(ts_fan) > to)){
+          if(id(last_fan_speed)!=255 && (now-id(ts_fan)>to)){
             ESP_LOGW("hrv","Fan speed stale -> zero");
-            id(last_fan_speed)=0;
-            id(hrv_fan_speed).publish_state(0);
-            id(hrv_fan_mode).publish_state("Off");
+            id(last_fan_speed)=0; id(hrv_fan_speed).publish_state(0); id(hrv_fan_mode).publish_state("Off");
           }
-          if(id(last_setpoint)!=255 && (now - id(ts_setpoint) > to)){
+          if(id(last_setpoint)!=255 && (now-id(ts_setpoint)>to)){
             ESP_LOGW("hrv","Setpoint stale -> zero");
-            id(last_setpoint)=0;
-            id(hrv_setpoint).publish_state(0);
+            id(last_setpoint)=0; id(hrv_setpoint).publish_state(0);
           }
 
 # ───────── Intervals ─────────
@@ -542,6 +525,17 @@ interval:
   - interval: 5s
     then:
       - script.execute: zero_stale_check
+      - lambda: |-
+          bool kp = id(emulation_active) || ((millis() - id(ts_house)) < 20000);
+          bool ct = (!id(emulation_active)) && ((millis() - id(ts_roof)) < 20000);
+          if(kp != id(keypad_online_state)){
+            id(keypad_online_state)=kp;
+            id(hrv_keypad_online).publish_state(kp);
+          }
+          if(ct != id(controller_online_state)){
+            id(controller_online_state)=ct;
+            id(hrv_controller_online).publish_state(ct);
+          }
 
   - interval: 30s
     then:
