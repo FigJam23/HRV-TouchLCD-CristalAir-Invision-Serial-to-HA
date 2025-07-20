@@ -1,0 +1,426 @@
+esphome:
+  name: hrv
+  friendly_name: HRV
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  power_save_mode: none
+  fast_connect: true
+  reboot_timeout: 5min
+  ap:
+    ssid: "Hrv Fallback Hotspot"
+    password: "Justj33p"
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+
+mqtt:
+  id: hrv_mqtt
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
+  discovery: true
+  topic_prefix: "hassio/hrv"
+  keepalive: 60s
+  on_connect:
+    - lambda: |-
+        ESP_LOGD("MQTT", "Connected");
+        id(last_house_temp) = 255;
+        id(last_roof_temp)  = 255;
+        id(last_setpoint)   = 255;
+        id(last_fan_speed)  = 255;
+  on_disconnect:
+    - lambda: |-
+        ESP_LOGD("MQTT", "Disconnected");
+
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: led
+    inverted: true
+
+uart:
+  id: hrv_uart
+  rx_pin: D2 #1
+  tx_pin: D1 #3
+  baud_rate: 1200
+
+# ───────── Globals for parsing & boot state machine ─────────
+globals:
+  - id: raw_buf
+    type: std::string
+    restore_value: no
+    initial_value: ""
+  - id: last_house_temp
+    type: float
+    restore_value: no
+    initial_value: "255"
+  - id: last_roof_temp
+    type: float
+    restore_value: no
+    initial_value: "255"
+  - id: last_fan_speed
+    type: int
+    restore_value: no
+    initial_value: "255"
+  - id: last_setpoint
+    type: int
+    restore_value: no
+    initial_value: "255"
+  - id: last_fan_mode
+    type: std::string
+    restore_value: no
+    initial_value: "\"\""
+  - id: last_humidity
+    type: float
+    restore_value: no
+    initial_value: "0"
+  - id: last_activity
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+  # Boot sequence control
+  - id: boot_active
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: boot_stage
+    type: uint8_t
+    restore_value: no
+    initial_value: "0"     # 0=idle,1=wait ACK,2..n=progressive groups
+  - id: boot_ack_count
+    type: uint8_t
+    restore_value: no
+    initial_value: "0"
+  - id: boot_last_progress_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+# ───────── Sensors / Text Sensors / Bits ─────────
+sensor:
+  - platform: template
+    name: "HRV House Temp"
+    id: hrv_house_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+  - platform: template
+    name: "HRV Roof Temp"
+    id: hrv_roof_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+  - platform: template
+    name: "HRV Control Setpoint"
+    id: hrv_setpoint
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    name: "HRV Fan Speed"
+    id: hrv_fan_speed
+    unit_of_measurement: "%"
+    icon: "mdi:fan"
+    accuracy_decimals: 1
+  - platform: template
+    name: "HRV Humidity"
+    id: hrv_humidity
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+  - platform: wifi_signal
+    name: "HRV WiFi Signal"
+    id: hrv_wifi_signal
+    update_interval: 30s
+
+text_sensor:
+  - platform: template
+    name: "HRV Fan Mode"
+    id: hrv_fan_mode
+  - platform: template
+    name: "HRV Flags Decimal"
+    id: hrv_flags_dec
+  - platform: template
+    name: "HRV Flags Binary"
+    id: hrv_flags_bin
+  - platform: template
+    name: "HRV Raw Frame"
+    id: hrv_raw_frame
+  - platform: template
+    name: "HRV Humidity Raw"
+    id: hrv_humidity_raw
+
+binary_sensor:
+  - platform: template
+    name: "HRV Flag Bit 0"
+    id: hrv_flag_bit0
+  - platform: template
+    name: "HRV Flag Bit 1"
+    id: hrv_flag_bit1
+  - platform: template
+    name: "HRV Flag Bit 2"
+    id: hrv_flag_bit2
+  - platform: template
+    name: "HRV Flag Bit 3"
+    id: hrv_flag_bit3
+  - platform: template
+    name: "HRV Flag Bit 4"
+    id: hrv_flag_bit4
+  - platform: template
+    name: "HRV Flag Bit 5"
+    id: hrv_flag_bit5
+  - platform: template
+    name: "HRV Flag Bit 6"
+    id: hrv_flag_bit6
+  - platform: template
+    name: "HRV Flag Bit 7"
+    id: hrv_flag_bit7
+
+# ───────── Boot Trigger Switch ─────────
+switch:
+  - platform: template
+    name: "HRV Boot Sequence"
+    id: hrv_boot_switch
+    optimistic: true
+    restore_mode: DISABLED   # replaces deprecated restore_state
+    turn_on_action:
+      - lambda: |-
+          if (id(boot_active)) {
+            ESP_LOGW("hrv_boot","Boot already active");
+            return;
+          }
+            ESP_LOGI("hrv_boot","Boot switch ON -> starting sequence");
+            id(boot_active) = true;
+            id(boot_stage) = 1;          // stage 1 = waiting for ACK after hellos
+            id(boot_ack_count) = 0;
+            id(boot_last_progress_ms) = millis();
+            // Send hello twice
+            auto send_hex = [&](const char* s){
+              std::string hex = s;
+              std::string no;
+              for(char c: hex) if(!isspace((unsigned char)c)) no+=c;
+              for(size_t i=0;i<no.size(); i+=2){
+                std::string bs = no.substr(i,2);
+                uint8_t v = strtol(bs.c_str(), nullptr, 16);
+                id(hrv_uart).write_byte(v);
+                delay(10);
+              }
+            };
+            send_hex("7E 37 01 71 00 1E 84 B5 7E");
+            delay(150);
+            send_hex("7E 37 01 71 00 1E 84 B5 7E");
+            ESP_LOGD("hrv_boot","Sent 2 hello frames; waiting for 4 ACKs");
+    turn_off_action:
+      - lambda: |-
+          if (id(boot_active)) {
+            ESP_LOGI("hrv_boot","Boot switch OFF -> aborting sequence");
+          }
+          id(boot_active) = false;
+          id(boot_stage) = 0;
+
+# ───────── Helper scripts (sending & processing) ─────────
+script:
+  - id: send_hex_string
+    parameters:
+      hex: string
+    then:
+      - lambda: |-
+          std::string s = hex;
+          std::string comp;
+            for(char c: s) if(!isspace((unsigned char)c)) comp+=c;
+          if(comp.size()%2) { ESP_LOGW("hrv_send","Odd hex length"); return; }
+          for(size_t i=0;i<comp.size();i+=2){
+            uint8_t v = strtol(comp.substr(i,2).c_str(), nullptr, 16);
+            id(hrv_uart).write_byte(v);
+            delay(8);
+          }
+
+  - id: advance_boot_stage
+    then:
+      - lambda: |-
+          if(!id(boot_active)) return;
+          id(boot_last_progress_ms) = millis();
+          uint8_t st = id(boot_stage);
+          ESP_LOGD("hrv_boot","Advancing from stage %u", st);
+
+          auto send_repeat = [&](const char* hex, int count, int delay_ms){
+            for(int i=0;i<count;i++){
+              id(send_hex_string).execute(std::string(hex));
+              delay(delay_ms);
+            }
+          };
+
+          switch(st){
+            case 1: // got ACKs -> send 38... 4×
+              id(boot_stage)=2;
+              send_repeat("7E 38 00 00 00 C8 7E",4,180);
+              id(boot_stage)=3;
+              // fall through to next groups sequentially without waiting for responses
+            case 3:
+              send_repeat("7E 42 C3 FB 7E",4,150);
+              id(boot_stage)=4;
+            case 4:
+              send_repeat("7E 46 00 00 00 BA 7E",4,150);
+              id(boot_stage)=5;
+            case 5:
+              send_repeat("7E 34 E3 E9 7E",3,150);
+              id(boot_stage)=6;
+            case 6:
+              send_repeat("7E 33 C3 0A 7E",4,150);
+              id(boot_stage)=7;
+            case 7:
+              send_repeat("7E 43 C3 FA 7E",4,150);
+              id(boot_stage)=8;
+            case 8:
+              send_repeat("7E 35 83 48 7E",4,150);
+              id(boot_stage)=9;
+              ESP_LOGI("hrv_boot","Boot sequence complete");
+              id(boot_active)=false;
+              id(boot_stage)=0;
+              id(hrv_boot_switch).turn_off();
+              break;
+            default:
+              break;
+          }
+
+  - id: hrv_process_uart
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> frame;
+          auto publish_fan_mode = [&](int raw){
+            std::string mode;
+            if      (raw == 0)   mode="Off";
+            else if (raw == 5)   mode="Idle";
+            else if (raw == 100) mode="Full";
+            else { char t[10]; snprintf(t,sizeof(t), "%d%%", raw); mode=t; }
+            id(hrv_fan_mode).publish_state(mode);
+          };
+
+          while(id(hrv_uart).available()){
+            uint8_t b=0; id(hrv_uart).read_byte(&b);
+            id(last_activity)=millis();
+
+            if(frame.empty()){
+              if(b==0x7E) frame.push_back(b);
+              continue;
+            }
+            frame.push_back(b);
+
+            if(b==0x7E && frame.size()>=5){
+              // raw hex
+              std::string hex; char h[4];
+              for(auto v:frame){ snprintf(h,sizeof(h),"%02X ",v); hex+=h; }
+              if(!hex.empty()) hex.pop_back();
+              id(hrv_raw_frame).publish_state(hex.c_str());
+
+              // Boot ACK detection (exact frame 7E 41 E3 DC 7E)
+              if(id(boot_active) && id(boot_stage)==1 &&
+                 frame.size()==5 && frame[1]==0x41 && frame[2]==0xE3 && frame[3]==0xDC){
+                id(boot_ack_count)++;
+                id(boot_last_progress_ms)=millis();
+                ESP_LOGD("hrv_boot","ACK %d/4", id(boot_ack_count));
+                if(id(boot_ack_count)>=4){
+                  ESP_LOGI("hrv_boot","All ACKs received");
+                  id(advance_boot_stage).execute();  // moves to next groups
+                }
+              }
+
+              // Decode (checksum style from earlier)
+              if(frame.size()<=12 && frame.size()>=6){
+                size_t cks_idx = frame.size()-2;
+                int sum=0;
+                for(size_t i=1;i<cks_idx;i++) sum -= frame[i];
+                uint8_t calc = uint8_t(sum & 0xFF);
+                uint8_t expect = frame[cks_idx];
+                if(calc==expect){
+                  uint8_t loc=frame[1];
+                  // temp
+                  if(frame.size()>=6){
+                    uint16_t rawT=(uint16_t(frame[2])<<8)|frame[3];
+                    float temp=rawT*0.0625f;
+                    int t2=int(temp*2+0.5f); temp=t2/2.0f;
+                    if(loc==0x31){
+                      if(temp!=id(last_house_temp)){
+                        id(last_house_temp)=temp;
+                        id(hrv_house_temp).publish_state(temp);
+                      }
+                    } else if(loc==0x30){
+                      if(temp!=id(last_roof_temp)){
+                        id(last_roof_temp)=temp;
+                        id(hrv_roof_temp).publish_state(temp);
+                      }
+                    }
+                  }
+                  if(loc==0x31 && frame.size()>=8){
+                    uint8_t fan_raw=frame[4];
+                    if(fan_raw!=id(last_fan_speed)){
+                      id(last_fan_speed)=fan_raw;
+                      id(hrv_fan_speed).publish_state(fan_raw);
+                      publish_fan_mode(fan_raw);
+                    }
+                    uint8_t setp=frame[5];
+                    if(setp!=id(last_setpoint)){
+                      id(last_setpoint)=setp;
+                      id(hrv_setpoint).publish_state(setp);
+                    }
+                  }
+                }
+              }
+
+              frame.clear();
+              continue;
+            }
+
+            if(frame.size()>20) frame.clear();
+          }
+
+# ───────── Intervals ─────────
+interval:
+  - interval: 50ms
+    then:
+      - script.execute: hrv_process_uart
+
+  - interval: 30s
+    then:
+      - lambda: |-
+          id(hrv_mqtt).publish("status", "1");
+
+  - interval: 5s
+    then:
+      - lambda: |-
+          // Boot timeout watchdog (15 s without progress at waiting stage)
+          if(id(boot_active)){
+            if( (millis() - id(boot_last_progress_ms)) > 15000 ){
+              ESP_LOGW("hrv_boot","Boot timeout / stalled at stage %u (ACKs=%u). Aborting.",
+                       id(boot_stage), id(boot_ack_count));
+              id(boot_active)=false;
+              id(boot_stage)=0;
+              id(hrv_boot_switch).turn_off();
+            }
+          }
+
+  - interval: 10s
+    then:
+      - lambda: |-
+          if (millis() - id(last_activity) > 300000) {
+            ESP_LOGW("WATCHDOG","No UART activity 5 min -> reboot");
+            App.reboot();
+          }
