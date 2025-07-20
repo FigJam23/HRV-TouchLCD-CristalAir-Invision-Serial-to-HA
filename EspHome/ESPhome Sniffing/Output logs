@@ -96,3 +96,82 @@ Frame A (7E 31 01 …)
 
 
 #keypad no controller conected. sniffs#
+Time	level	Tag	Message
+12:07:12	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
+12:07:12	[D]	[sensor:104]	
+'HRV House Temp': Sending state 23.50000 °C with 1 decimals of accuracy
+12:07:13	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
+12:07:13	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
+12:07:13	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
+12:07:13	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
+12:07:13	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 74 00 1E 84 70 48 7E'
+12:07:14	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 74 00 1E 84 70 48 7E'
+12:07:14	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 74 00 1E 84 70 48 7E'
+12:07:14	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 74 00 1E 84 70 48 7E'
+12:07:14	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 74 00 1E 84 70 48 7E'
+12:07:14	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 72 00 1E 84 70 4A 7E'
+12:07:14	[D]	[sensor:104]	
+'HRV House Temp': Sending state 23.00000 °C with 1 decimals of accuracy
+12:07:15	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 72 00 1E 84 70 4A 7E'
+12:07:15	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 72 00 1E 84 70 4A 7E'
+12:07:15	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 31 01 72 00 1E 84 70 4A 7E'
+12:07:15	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 36 00 00 00 CA 7E'
+12:07:15	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 36 00 00 00 CA 7E'
+12:07:16	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 36 00 00 00 CA 7E'
+12:07:16	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 36 00 00 00 CA 7E'
+12:07:16	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 37 01 72 00 1E 84 B4 7E'
+12:07:16	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 37 01 72 00 1E 84 B4 7E'
+12:07:16	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 37 01 72 00 1E 84 B4 7E'
+12:07:17	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 37 01 72 00 1E 84 B4 7E'
+12:07:17	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 41 E3 DC 7E'
+12:07:17	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 41 E3 DC 7E'
+12:07:17	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 41 E3 DC 7E'
+12:07:18	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 41 E3 DC 7E'
+12:07:18	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 38 00 00 00 C8 7E'
+12:07:18	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 38 00 00 00 C8 7E'
+12:07:18	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 38 00 00 00 C8 7E'
+12:07:18	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 38 00 00 00 C8 7E'
+12:07:19	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 42 C3 FB 7E'
+12:07:19	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 42 C3 FB 7E'
+12:07:19	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 42 C3 FB 7E'
+12:07:19	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 42 C3 FB 7E'
+12:07:20	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 46 00 00 00 BA 7E'
+12:07:20	[D]	[text_sensor:069]	
+'HRV Raw Frame': Sending state '7E 46 00 00 00 BA 7E'
+12:07:27	[D]	[sensor:104]	
+'HRV WiFi Signal': Sending state -57.00000 dBm with 0 decimals of accuracy
