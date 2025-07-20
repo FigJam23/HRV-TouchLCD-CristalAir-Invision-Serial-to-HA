@@ -177,7 +177,7 @@ Time	level	Tag	Message
 'HRV WiFi Signal': Sending state -57.00000 dBm with 0 decimals of accuracy
 
 
-#key pad and controller first boot run#
+#key pad and controller first boot run Controller response:7E 30 01 24 00 AB 7E#
 
 Time	level	Tag	Message
 12:28:24	[D]	[text_sensor:069]	
