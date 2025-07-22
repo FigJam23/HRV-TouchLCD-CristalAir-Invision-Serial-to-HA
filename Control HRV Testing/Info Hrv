@@ -8,3 +8,14 @@ Messages often follow this pattern:
 [START_FLAG: 0x7E] → [ADDRESS] → [COMMAND] → [LENGTH] → [DATA] → [CHECKSUM] → [END_FLAG: 0x7E]
 ```
 - **Byte-stuffing** (escaping) is used if `0x7E`/`0x7D` appear in payloads (similar to HDLC/PPP).
+# Volume Set Command (hypothetical):
+# 7E 01 23 01 50 CRC16 7E
+# └─┘ └┘ └┘ └┘ └┘ └───┘ └─┘
+#  │   │  │  │  │   │    │
+#  │   │  │  │  │   │    └ End Flag (0x7E)
+#  │   │  │  │  │   └ CRC-16 (e.g., 0xB3 0x7D)  
+#  │   │  │  │  └ Volume Level (0x50 = 80%)
+#  │   │  │  └ Data Length (0x01 = 1 byte)
+#  │   │  └ Command Opcode (0x23 = Set Volume)
+#  │   └ Device Address (0x01 = Seat 1A)
+#  └ Start Flag (0x7E)
