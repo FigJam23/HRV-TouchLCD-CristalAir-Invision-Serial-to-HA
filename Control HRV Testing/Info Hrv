@@ -1,0 +1,10 @@
+The **Cristal Air/Invision system** (developed by **Thales Group**) uses proprietary communication protocols for in-flight entertainment (IFE) and cabin management systems. While detailed public documentation is scarce due to proprietary restrictions, protocols with **hex framing (e.g., `0x7E` start/end flags)** are common in aviation systems. Below is a conceptual overview and generic code examples for handling such protocols:
+
+---
+
+### **Typical Structure of Framed Messages**  
+Messages often follow this pattern:  
+```plaintext
+[START_FLAG: 0x7E] → [ADDRESS] → [COMMAND] → [LENGTH] → [DATA] → [CHECKSUM] → [END_FLAG: 0x7E]
+```
+- **Byte-stuffing** (escaping) is used if `0x7E`/`0x7D` appear in payloads (similar to HDLC/PPP).
