@@ -1,0 +1,240 @@
+esphome:
+  name: hrv_keypad_emulator
+  friendly_name: HRV Keypad Emulator
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  ap:
+    ssid: "HRV Fallback"
+    password: "Justj33p"
+
+logger:
+  baud_rate: 0  # disable UART logging
+  level: VERY_VERBOSE
+
+api:
+ota:
+
+web_server:
+  port: 80
+
+mqtt:
+  broker: 192.168.1.44
+  username: mqtt
+  password: Justj33p
+  topic_prefix: hassio/hrv
+
+uart:
+  id: hrv_uart
+  tx_pin: D1
+  rx_pin: D2
+  baud_rate: 1200
+  stop_bits: 1
+  parity: NONE
+  data_bits: 8
+
+# ────── House Temp via DHT22 ──────
+dht:
+  - pin: D5
+    model: AM2302
+    temperature:
+      name: "HRV House Temp"
+      id: hrv_house_temp
+    humidity:
+      name: "HRV Humidity"
+      id: hrv_humidity
+    update_interval: 30s
+
+# ────── Globals ──────
+globals:
+  - id: desired_fan_speed
+    type: int
+    initial_value: "10"
+  - id: desired_setpoint
+    type: int
+    initial_value: "22"
+  - id: boot_phase
+    type: int
+    initial_value: "0"
+  - id: last_emulate_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: last_controller_response
+    type: uint32_t
+    initial_value: "0"
+  - id: controller_online
+    type: bool
+    initial_value: "false"
+
+# ────── Sensors ──────
+sensor:
+  - platform: template
+    name: "HRV Roof Temp"
+    id: hrv_roof_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+binary_sensor:
+  - platform: template
+    name: "HRV Controller Online"
+    lambda: |-
+      return id(controller_online);
+    update_interval: 10s
+    device_class: connectivity
+
+text_sensor:
+  - platform: template
+    name: "HRV Last Raw Frame"
+    id: hrv_raw_frame
+    icon: "mdi:code-braces"
+    update_interval: never
+
+# ────── Fan/Setpoint Controls ──────
+number:
+  - platform: template
+    name: "HRV Setpoint"
+    id: hrv_setpoint_control
+    min_value: 14
+    max_value: 30
+    step: 1
+    set_action:
+      - lambda: |-
+          id(desired_setpoint) = int(x);
+          ESP_LOGI("hrv", "New setpoint: %d", id(desired_setpoint));
+
+  - platform: template
+    name: "HRV Fan Speed"
+    id: hrv_fan_speed_control
+    min_value: 0
+    max_value: 100
+    step: 5
+    set_action:
+      - lambda: |-
+          id(desired_fan_speed) = int(x);
+          ESP_LOGI("hrv", "New fan speed: %d%%", id(desired_fan_speed));
+
+# ────── Reboot Button ──────
+button:
+  - platform: restart
+    name: "Restart HRV Emulator"
+
+# ────── Intervals ──────
+interval:
+  - interval: 100ms
+    then:
+      - script.execute: parse_uart
+
+  - interval: 1s
+    then:
+      - script.execute: emulate_keypad
+
+  - interval: 30s
+    then:
+      - lambda: |-
+          bool online = (millis() - id(last_controller_response) < 30000);
+          id(controller_online) = online;
+          if (!online && id(boot_phase) >= 4) {
+            ESP_LOGW("hrv", "Controller offline — restarting handshake");
+            id(boot_phase) = 0;
+          }
+
+# ────── Scripts ──────
+script:
+  - id: send_frame
+    parameters: { hex: string }
+    then:
+      - lambda: |-
+          std::string s=hex, clean;
+          for (char c : s) if (!isspace((unsigned char)c)) clean += c;
+          for (size_t i = 0; i < clean.size(); i += 2) {
+            uint8_t byte = strtol(clean.substr(i, 2).c_str(), nullptr, 16);
+            id(hrv_uart).write_byte(byte);
+            delay(7);
+          }
+
+  - id: send_status
+    then:
+      - lambda: |-
+          int fan = std::max(0, std::min(100, id(desired_fan_speed)));
+          int setp = std::max(14, std::min(30, id(desired_setpoint)));
+          float house_temp = isnan(id(hrv_house_temp).state) ? 21.0 : id(hrv_house_temp).state;
+          uint16_t raw = (uint16_t)(house_temp / 0.0625f + 0.5f);
+          uint8_t th = raw >> 8;
+          uint8_t tl = raw & 0xFF;
+
+          uint8_t frame[10] = {0x7E, 0x31, 0x01, th, tl, (uint8_t)fan, (uint8_t)setp, 0x84, 0x70, 0x00};
+          int sum = 0;
+          for (int i = 1; i <= 8; i++) sum -= frame[i];
+          frame[9] = sum & 0xFF;
+
+          for (int i = 0; i < 10; i++) id(hrv_uart).write_byte(frame[i]);
+          id(hrv_uart).write_byte(0x7E);
+
+  - id: emulate_keypad
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+          if (id(boot_phase) == 0 && now - id(last_emulate_ms) > 1000) {
+            id(send_frame).execute("7E 37 01 6C 00 1E 84 BA 7E");
+            id(last_emulate_ms) = now;
+            id(boot_phase) = 1;
+          } else if (id(boot_phase) == 1 && now - id(last_emulate_ms) > 2000) {
+            id(send_frame).execute("7E 37 01 6C 00 1E 84 BA 7E");
+            id(last_emulate_ms) = now;
+            id(boot_phase) = 2;
+          } else if (id(boot_phase) == 2 && now - id(last_emulate_ms) > 1000) {
+            id(send_frame).execute("7E 38 00 00 00 C8 7E");
+            id(last_emulate_ms) = now;
+            id(boot_phase) = 3;
+          } else if (id(boot_phase) == 3 && now - id(last_emulate_ms) > 1000) {
+            id(send_status).execute();
+            id(last_emulate_ms) = now;
+            id(boot_phase) = 4;
+          } else if (id(boot_phase) == 4 && now - id(last_emulate_ms) > 10000) {
+            id(send_status).execute();
+            id(last_emulate_ms) = now;
+          }
+
+  - id: parse_uart
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> buf;
+          while (id(hrv_uart).available()) {
+            uint8_t byte;
+            id(hrv_uart).read_byte(&byte);
+            if (buf.empty() && byte == 0x7E) {
+              buf.push_back(byte);
+            } else if (!buf.empty()) {
+              buf.push_back(byte);
+              if (byte == 0x7E && buf.size() >= 6) {
+                char hex[128] = {0};
+                for (size_t i = 0; i < buf.size(); i++) {
+                  sprintf(hex + strlen(hex), "%02X ", buf[i]);
+                }
+                id(hrv_raw_frame).publish_state(hex);
+
+                if (buf[1] == 0x30) {
+                  uint16_t rawT = (uint16_t(buf[2]) << 8) | buf[3];
+                  float temp = rawT * 0.0625f;
+                  if (temp >= 0 && temp <= 50) {
+                    id(hrv_roof_temp).publish_state(temp);
+                    id(last_controller_response) = millis();
+                  }
+                } else {
+                  id(last_controller_response) = millis();
+                }
+
+                buf.clear();
+              } else if (buf.size() > 20) {
+                buf.clear();
+              }
+            }
+          }
