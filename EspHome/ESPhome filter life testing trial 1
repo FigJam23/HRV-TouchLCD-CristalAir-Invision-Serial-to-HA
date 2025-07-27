@@ -157,25 +157,22 @@ script:
       - lambda: |-
           static std::vector<uint8_t> frame;
           while (id(hrv_uart).available()) {
-            uint8_t b;
-            id(hrv_uart).read_byte(&b);
-            // frame start
+            uint8_t b; id(hrv_uart).read_byte(&b);
             if (frame.empty()) {
               if (b == 0x7E) frame.push_back(b);
               continue;
             }
             frame.push_back(b);
-            // frame end
             if (b == 0x7E && frame.size() >= 7) {
-              // validate checksum
+              // checksum
               size_t cks_idx = frame.size() - 2;
               int sum = 0;
               for (size_t i = 1; i < cks_idx; ++i) sum -= frame[i];
               if ((uint8_t)(sum & 0xFF) == frame[cks_idx]) {
                 uint8_t type = frame[1];
-                // ─── type 0x31 ───
+                // ─── House frame ───
                 if (type == 0x31 && frame.size() == 10) {
-                  // House temp
+                  // house temp
                   uint16_t rawT = (uint16_t(frame[2]) << 8) | frame[3];
                   float temp = rawT * 0.0625f;
                   if (temp >= 0 && temp <= 45) {
@@ -183,31 +180,31 @@ script:
                     id(ts_house) = millis();
                     id(hrv_house_temp).publish_state(id(last_house_temp));
                   }
-                  // ── Filter life gauge ──
-                  const float min_raw = 27.0f, max_raw = 42.0f;
-                  float raw = frame[4];
-                  float pct = (max_raw - raw) / (max_raw - min_raw) * 100.0f;
-                  int   fp  = pct < 0   ? 0
-                              : pct > 100 ? 100
-                              : lround(pct);
-                  id(hrv_filter_percent) = fp;
-                  id(hrv_filter_life).publish_state(fp);
-                  // ── Setpoint ──
+                  // fan speed (original)
+                  int fan = frame[4];
+                  if (fan >= 0 && fan <= 100) {
+                    id(last_fan_speed) = fan;
+                    id(ts_fan) = millis();
+                    id(hrv_fan_speed).publish_state(fan);
+                  }
+                  // setpoint (original)
                   int sp = frame[5];
                   if (sp >= 14 && sp <= 30) {
                     id(last_setpoint) = sp;
                     id(ts_setpoint) = millis();
                     id(hrv_setpoint).publish_state(sp);
                   }
-                  // ── Fan speed ── (if you know the correct offset, adjust frame[6] or frame[7])
-                  int fan = frame[6];
-                  if (fan >= 0 && fan <= 100) {
-                    id(last_fan_speed) = fan;
-                    id(ts_fan) = millis();
-                    id(hrv_fan_speed).publish_state(fan);
-                  }
+                  // ─── filter life mapping ───
+                  const float minRaw = 27.0f, maxRaw = 42.0f;
+                  float rawFilter = frame[4];
+                  float pct = (maxRaw - rawFilter) / (maxRaw - minRaw) * 100.0f;
+                  int fp = pct < 0   ? 0
+                            : pct > 100 ? 100
+                            : lround(pct);
+                  id(hrv_filter_percent) = fp;
+                  id(hrv_filter_life).publish_state(fp);
                 }
-                // ─── type 0x30 ─── (Roof temp)
+                // ─── Roof frame ───
                 else if (type == 0x30 && frame.size() == 7) {
                   uint16_t rawT = (uint16_t(frame[2]) << 8) | frame[3];
                   float temp = rawT * 0.0625f;
@@ -220,7 +217,6 @@ script:
               }
               frame.clear();
             }
-            // safety
             if (frame.size() > 24) frame.clear();
           }
 
@@ -232,6 +228,7 @@ script:
           if (now - id(ts_roof)     > to) id(hrv_roof_temp).publish_state(0);
           if (now - id(ts_fan)      > to) id(hrv_fan_speed).publish_state(0);
           if (now - id(ts_setpoint) > to) id(hrv_setpoint).publish_state(0);
+
 
 interval:
   - interval: 80ms
