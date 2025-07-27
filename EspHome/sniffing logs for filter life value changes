@@ -1,0 +1,438 @@
+
+filter life at 10 percent 
+
+
+[10:40:03][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:03][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:40:04][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:04][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:40:05][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:05][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:06][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:06][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:07][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:07][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:08][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:08][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:09][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:09][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:10][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:10][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:40:11][I][raw_sniffer:072]: Frame: 7E 31 01 34 27 1D 84 70 62 7E
+[10:40:11][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:12][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:12][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:13][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:13][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:40:14][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:14][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:15][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:15][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:16][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:16][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:17][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:17][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:18][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:18][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+[10:40:19][I][raw_sniffer:072]: Frame: 7E 31 01 35 27 1D 84 70 61 7E
+[10:40:19][I][raw_sniffer:072]: Frame: 7E 30 01 10 00 BF 7E
+
+
+
+
+
+befor filter  reset, filter life at 30 percent 
+
+
+[10:41:56][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:41:56][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:41:57][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:41:57][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:41:58][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:41:58][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:41:59][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:41:59][I][raw_sniffer:072]: Frame: 7E 30 01 11 00 BE 7E
+[10:42:00][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:42:00][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:01][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:42:01][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:02][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:02][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:03][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:42:03][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:04][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:04][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:05][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:05][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:06][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:06][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:07][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:07][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:08][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:08][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:09][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:42:09][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:10][I][raw_sniffer:072]: Frame: 7E 31 01 36 24 1D 84 70 63 7E
+[10:42:10][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:11][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:11][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:12][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:12][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:13][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:13][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:14][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:14][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:15][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:15][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:16][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:16][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:17][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:17][I][raw_sniffer:072]: Frame: 7E 30 01 12 00 BD 7E
+[10:42:18][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 70 62 7E
+[10:42:18][I][raw_sniffer:072]: Frame: 7E 30 01 13 00 BC 7E
+[10:42:19][I][raw_sniffer:072]: Frame: 7E 31 01 37 24 1D 84 7
+
+
+
+
+
+
+
+
+
+
+after filter reset , filter life at 100 percent 
+
+[10:36:08][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:08][I][raw_sniffer:072]: Frame: 7E 30 01 0D 00 C2 7E
+[10:36:09][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:09][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:10][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:10][I][raw_sniffer:072]: Frame: 7E 30 01 0D 00 C2 7E
+[10:36:11][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:11][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:12][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:12][I][raw_sniffer:072]: Frame: 7E 30 01 0D 00 C2 7E
+[10:36:13][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:13][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:14][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:14][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:15][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:15][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:16][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:16][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:17][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:17][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:18][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:18][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:19][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:19][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:20][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:20][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:21][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:21][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:22][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:22][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:23][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:23][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:24][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:24][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:25][I][raw_sniffer:072]: Frame: 7E 31 01 31 1B 1D 84 70 71 7E
+[10:36:25][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:26][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:26][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:27][I][raw_sniffer:072]: Frame: 7E 31 01 31 1B 1D 84 70 71 7E
+[10:36:27][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:28][I][raw_sniffer:072]: Frame: 7E 31 01 31 1B 1D 84 70 71 7E
+[10:36:28][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:29][I][raw_sniffer:072]: Frame: 7E 31 01 31 1B 1D 84 70 71 7E
+[10:36:29][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:30][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:30][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:31][I][raw_sniffer:072]: Frame: 7E 31 01 32 1B 1D 84 70 70 7E
+[10:36:31][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+[10:36:32][I][raw_sniffer:072]: Frame: 7E 31 01 31 1B 1D 84 70 71 7E
+[10:36:32][I][raw_sniffer:072]: Frame: 7E 30 01 0E 00 C1 7E
+
+
+befor filter  reset, filter life at 5 percent 
+
+10:58:48][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:48][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:49][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:49][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:50][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:50][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:50][W][component:407]: interval took a long time for an operation (61 ms)
+[10:58:50][W][component:408]: Components should block for at most 30 ms
+[10:58:50][W][component:407]: wifi took a long time for an operation (69 ms)
+[10:58:50][W][component:408]: Components should block for at most 30 ms
+[10:58:51][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:51][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:52][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:52][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:53][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:53][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:54][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:54][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:55][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:55][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:56][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:56][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:57][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:57][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:58][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:58][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:58:59][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:58:59][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[10:59:00][I][raw_sniffer:072]: Frame: 7E 31 01 33 27 1D 84 70 63 7E
+[10:59:00][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+
+
+
+
+
+befor filter  reset, filter life at 50 percent 
+
+
+
+11:00:07][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[11:00:08][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:08][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+[11:00:09][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:09][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[11:00:10][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:10][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[11:00:11][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:11][I][raw_sniffer:072]: Frame: 7E 30 01 19 00 B6 7E
+[11:00:12][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:12][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+[11:00:13][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:13][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+[11:00:14][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:14][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+[11:00:15][I][raw_sniffer:072]: Frame: 7E 31 01 35 21 1D 84 70 67 7E
+[11:00:15][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+[11:00:16][I][raw_sniffer:072]: Frame: 7E 31 01 34 21 1D 84 70 68 7E
+[11:00:16][I][raw_sniffer:072]: Frame: 7E 30 01 1A 00 B5 7E
+
+
+
+
+
+
+
+
+
+after filter reset , filter life at 75 percent 
+
+[11:01:31][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:32][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:32][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:33][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:33][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:34][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:34][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:35][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:35][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:36][I][raw_sniffer:072]: Frame: 7E 31 01 35 21 1D 84 70 67 7E
+[11:01:36][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:37][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:37][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:38][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:38][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:39][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:39][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:40][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:40][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:41][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:41][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:42][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:42][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:43][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:43][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:44][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:44][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:45][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:45][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+[11:01:46][I][raw_sniffer:072]: Frame: 7E 31 01 36 21 1D 84 70 66 7E
+[11:01:46][I][raw_sniffer:072]: Frame: 7E 30 01 1C 00 B3 7E
+
+
+after filter reset , filter life at 20 percent 
+
+][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:08][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:09][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:09][I][raw_sniffer:072]: Frame: 7E 30 01 24 00 AB 7E
+[11:15:10][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:10][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:11][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:11][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:12][I][raw_sniffer:072]: Frame: 7E 31 01 37 2A 1D 84 70 5C 7E
+[11:15:12][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:13][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:13][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:14][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:14][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:15][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:15][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:16][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:16][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:17][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:17][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:18][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:18][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:19][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:19][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:20][I][raw_sniffer:072]: Frame: 7E 31 01 37 2A 1D 84 70 5C 7E
+[11:15:20][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+[11:15:21][I][raw_sniffer:072]: Frame: 7E 31 01 36 2A 1D 84 70 5D 7E
+[11:15:21][I][raw_sniffer:072]: Frame: 7E 30 01 23 00 AC 7E
+
+after filter reset , filter life at 40 percent 
+
+11:16:24][I][raw_sniffer:072]: Frame: 7E 31 01 38 27 1D 84 70 5E 7E
+[11:16:24][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:25][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:25][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:26][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:26][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:27][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:27][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:28][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:28][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:29][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:29][I][raw_sniffer:072]: Frame: 7E 30 01 20 00 AF 7E
+[11:16:30][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:30][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:31][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:31][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:32][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:32][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:33][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:33][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:34][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:34][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:35][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:35][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:36][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:36][I][raw_sniffer:072]: Frame: 7E 30 01 20 00 AF 7E
+[11:16:37][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:37][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:38][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:38][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:16:39][I][raw_sniffer:072]: Frame: 7E 31 01 38 25 1E 84 70 5F 7E
+[11:16:39][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+
+
+
+after filter reset , filter life at 60 percent 
+
+11:17:37][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:38][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:38][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:39][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:39][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:40][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:40][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:41][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:41][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:17:42][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:42][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:43][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:43][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:44][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:44][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:45][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:45][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:46][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:46][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:47][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:47][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:48][I][raw_sniffer:072]: Frame: 7E 31 01 39 22 1E 84 70 61 7E
+[11:17:48][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:17:49][I][raw_sniffer:072]: Frame: 7E 31 01 3A 22 1E 84 70 60 7E
+[11:17:49][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+
+
+after filter reset , filter life at 80 percent 
+
+11:18:49][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:18:50][I][raw_sniffer:072]: Frame: 7E 31 01 39 21 1E 84 70 62 7E
+[11:18:50][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:51][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:51][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:52][I][raw_sniffer:072]: Frame: 7E 31 01 39 21 1E 84 70 62 7E
+[11:18:52][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:53][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:53][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:54][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:54][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:55][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:55][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:18:56][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:56][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:57][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:57][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:18:58][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:18:58][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:18:59][I][raw_sniffer:072]: Frame: 7E 31 01 39 21 1E 84 70 62 7E
+[11:18:59][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:00][I][raw_sniffer:072]: Frame: 7E 31 01 39 21 1E 84 70 62 7E
+[11:19:00][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:01][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:01][I][raw_sniffer:072]: Frame: 7E 30 01 21 00 AE 7E
+[11:19:02][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:02][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:03][I][raw_sniffer:072]: Frame: 7E 31 01 39 21 1E 84 70 62 7E
+[11:19:03][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+
+
+after filter reset , filter life at 90 percent 
+
+
+:42][I][raw_sniffer:072]: Frame: 7E 31 01 37 21 1E 84 70 64 7E
+[11:19:42][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:43][I][raw_sniffer:072]: Frame: 7E 31 01 37 21 1E 84 70 64 7E
+[11:19:43][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:44][I][raw_sniffer:072]: Frame: 7E 31 01 37 21 1E 84 70 64 7E
+[11:19:44][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:45][I][raw_sniffer:072]: Frame: 7E 31 01 37 21 1E 84 70 64 7E
+[11:19:45][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:46][I][raw_sniffer:072]: Frame: 7E 31 01 37 21 1E 84 70 64 7E
+[11:19:46][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:47][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:47][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:48][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:48][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:49][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:49][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:50][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:50][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:51][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:51][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:52][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:52][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:53][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:53][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:54][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:54][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:55][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:55][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:56][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:56][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+[11:19:57][I][raw_sniffer:072]: Frame: 7E 31 01 38 21 1E 84 70 63 7E
+[11:19:57][I][raw_sniffer:072]: Frame: 7E 30 01 22 00 AD 7E
+
+
+
+
+Here’s the summary of everything you’ve captured so far:
+Filter Life	7E 31 01 frame, 4th byte (hex) → dec	Notes
+5 %	0x27 → 39	“low‑life” band
+10 %	0x27 → 39	same as 5 %
+30 %	0x24 → 36	next band up
+50 %	0x21 → 33	another band
+75 %	0x21 → 33	same as 50 %
+100 %	0x1B → 27	full‑life band
