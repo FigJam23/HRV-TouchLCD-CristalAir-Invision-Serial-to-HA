@@ -2,6 +2,8 @@
 
 A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control panel and publishes it to Home Assistant via MQTT. Pulls house & roof temperatures, fan speed and control-panel setpoint; plans for sending control commands in a future update.
 
+https://manuals.plus/hrv/3843-classic-controller-manual
+
 ---
 
 ## 📦 Hardware
