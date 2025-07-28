@@ -263,6 +263,16 @@ binary_sensor:
     lambda: |-
       return id(hrv_days_remaining) <= 0;
 
+  - platform: template
+    name: "HRV Keypad On Off State"
+    id: hrv_keypad_on
+    device_class: power  
+    lambda: |-
+      // returns true (ON) when fan speed > 0, false (OFF) when fan speed == 0
+      return id(hrv_fan_speed).state > 0;
+     
+
+
 switch:
   - platform: template
     name: "HRV Second Unit Enabled"
