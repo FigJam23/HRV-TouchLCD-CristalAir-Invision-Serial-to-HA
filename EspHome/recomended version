@@ -44,7 +44,6 @@ mqtt:
   keepalive: 60s
   on_connect:
     - lambda: |-
-        ESP_LOGD("MQTT","Connected");
         id(last_house_temp)=255;
         id(last_roof_temp)=255;
         id(last_setpoint)=255;
@@ -73,35 +72,30 @@ globals:
   - id: ts_house
     type: uint32_t
     initial_value: "0"
-
   - id: last_roof_temp
     type: float
     initial_value: "255"
   - id: ts_roof
     type: uint32_t
     initial_value: "0"
-
   - id: last_fan_speed
     type: int
     initial_value: "255"
   - id: ts_fan
     type: uint32_t
     initial_value: "0"
-
   - id: last_setpoint
     type: int
     initial_value: "255"
   - id: ts_setpoint
     type: uint32_t
     initial_value: "0"
-
   - id: sensor_timeout_ms
     type: uint32_t
     initial_value: "15000"
-
   - id: hrv_days_remaining
     type: int
-    initial_value: "365"  # start at full life (365 days)
+    initial_value: "365"  # full filter life
 
 # ───────── Sensors ─────────
 sensor:
@@ -118,12 +112,6 @@ sensor:
     accuracy_decimals: 1
 
   - platform: template
-    name: "HRV Control Setpoint"
-    id: hrv_setpoint
-    unit_of_measurement: "°C"
-    accuracy_decimals: 0
-
-  - platform: template
     name: "HRV Fan Speed"
     id: hrv_fan_speed
     unit_of_measurement: "%"
@@ -131,15 +119,10 @@ sensor:
     accuracy_decimals: 0
 
   - platform: template
-    name: "HRV Humidity"
-    id: hrv_humidity
-    unit_of_measurement: "%"
-    accuracy_decimals: 1
-
-  - platform: wifi_signal
-    name: "HRV WiFi Signal"
-    id: hrv_wifi_signal
-    update_interval: 30s
+    name: "HRV Control Setpoint"
+    id: hrv_setpoint
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
 
   - platform: template
     name: "HRV Filter Life"
@@ -148,8 +131,12 @@ sensor:
     icon: "mdi:air-filter"
     accuracy_decimals: 0
     lambda: |-
-      // calculate % from days remaining
       return (int)round(id(hrv_days_remaining) * 100.0f / 365.0f);
+
+  - platform: wifi_signal
+    name: "HRV WiFi Signal"
+    id: hrv_wifi_signal
+    update_interval: 30s
 
 # ───────── UI Controls ─────────
 number:
@@ -162,22 +149,63 @@ number:
     optimistic: true
     restore_value: yes
     set_action:
+      # 1) update internal counter
       - lambda: |-
-          int days = (int)x;                          // use 'x' here
-          id(hrv_days_remaining) = days;
-          id(hrv_filter_days_remaining).publish_state(days);
-          // immediately update the % sensor
-          id(hrv_filter_life).publish_state(round(days * 100.0f / 365.0f));
+          id(hrv_days_remaining) = (int)x;
+          // immediately update both UI entities
+          id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/365.0));
+      # 2) mirror to MQTT
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: !lambda 'return to_string(id(hrv_days_remaining));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/365.0));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: !lambda 'return id(hrv_days_remaining) <= 0 ? "ON" : "OFF";'
+          qos: 1
+          retain: true
 
 button:
   - platform: template
     name: "HRV Filter Reset"
     icon: "mdi:restart"
     on_press:
+      # reset counter
       - lambda: |-
           id(hrv_days_remaining) = 365;
           id(hrv_filter_days_remaining).publish_state(365);
           id(hrv_filter_life).publish_state(100);
+      # publish to MQTT
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: "365"
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: "100"
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: "OFF"
+          qos: 1
+          retain: true
+
+binary_sensor:
+  - platform: template
+    name: "HRV Filter Replacement Needed"
+    id: hrv_filter_replacement_needed
+    device_class: problem
+    lambda: |-
+      return id(hrv_days_remaining) <= 0;
 
 # ───────── Scripts ─────────
 script:
@@ -193,40 +221,40 @@ script:
             }
             frame.push_back(b);
             if (b == 0x7E && frame.size() >= 7) {
-              // checksum
-              size_t cks_idx = frame.size() - 2;
+              size_t cks = frame.size() - 2;
               int sum = 0;
-              for (size_t i = 1; i < cks_idx; ++i) sum -= frame[i];
-              if ((uint8_t)(sum & 0xFF) == frame[cks_idx]) {
-                uint8_t type = frame[1];
-                // ─── House frame ───
-                if (type == 0x31 && frame.size() == 10) {
-                  uint16_t rawT = (uint16_t(frame[2]) << 8) | frame[3];
-                  float temp = rawT * 0.0625f;
-                  if (temp >= 0 && temp <= 45) {
-                    id(last_house_temp) = round(temp * 10) / 10.0f;
+              for (size_t i = 1; i < cks; ++i) sum -= frame[i];
+              if ((uint8_t)(sum & 0xFF) == frame[cks]) {
+                uint8_t t = frame[1];
+                if (t == 0x31 && frame.size() == 10) {
+                  // House temp
+                  uint16_t r = (frame[2] << 8) | frame[3];
+                  float tmp = r * 0.0625f;
+                  if (tmp >= 0 && tmp <= 45) {
+                    id(last_house_temp) = round(tmp*10)/10.0f;
                     id(ts_house) = millis();
                     id(hrv_house_temp).publish_state(id(last_house_temp));
                   }
+                  // Fan speed
                   int fan = frame[4];
                   if (fan >= 0 && fan <= 100) {
                     id(last_fan_speed) = fan;
                     id(ts_fan) = millis();
                     id(hrv_fan_speed).publish_state(fan);
                   }
+                  // Setpoint
                   int sp = frame[5];
                   if (sp >= 14 && sp <= 30) {
                     id(last_setpoint) = sp;
                     id(ts_setpoint) = millis();
                     id(hrv_setpoint).publish_state(sp);
                   }
-                }
-                // ─── Roof frame ───
-                else if (type == 0x30 && frame.size() == 7) {
-                  uint16_t rawT = (uint16_t(frame[2]) << 8) | frame[3];
-                  float temp = rawT * 0.0625f;
-                  if (temp >= 0 && temp <= 45) {
-                    id(last_roof_temp) = round(temp * 10) / 10.0f;
+                } else if (t == 0x30 && frame.size() == 7) {
+                  // Roof temp
+                  uint16_t r = (frame[2] << 8) | frame[3];
+                  float tmp = r * 0.0625f;
+                  if (tmp >= 0 && tmp <= 45) {
+                    id(last_roof_temp) = round(tmp*10)/10.0f;
                     id(ts_roof) = millis();
                     id(hrv_roof_temp).publish_state(id(last_roof_temp));
                   }
@@ -246,6 +274,7 @@ script:
           if (now - id(ts_fan)      > to) id(hrv_fan_speed).publish_state(0);
           if (now - id(ts_setpoint) > to) id(hrv_setpoint).publish_state(0);
 
+# ───────── Intervals ─────────
 interval:
   - interval: 80ms
     then:
@@ -258,8 +287,23 @@ interval:
   - interval: 24h
     then:
       - lambda: |-
-          // decrement filter days each day
           if (id(hrv_days_remaining) > 0)
-            id(hrv_days_remaining)--;
+            id(hrv_days_remaining)--; 
+          // update UI
           id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
-          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining) * 100.0f / 365.0f));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/365.0));
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: !lambda 'return to_string(id(hrv_days_remaining));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/365.0));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: !lambda 'return id(hrv_days_remaining)<=0 ? "ON" : "OFF";'
+          qos: 1
+          retain: true
