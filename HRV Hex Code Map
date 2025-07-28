@@ -1,3 +1,6 @@
+
+```
+
 ── Roof temp (t=0x30, 7 bytes) ──
 7E      ← Start
 0x30    ← t = 0x30 (roof/remote temp)
@@ -83,3 +86,4 @@
 0xC8    ← low byte (200 × 0.0625 = 12.5 °C)
 0x??    ← checksum
 7E
+```
