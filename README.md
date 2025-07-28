@@ -99,10 +99,10 @@ Verify RX/TX correctly connected.
 - **Diagnostics & Raw Data**  
   - Raw packet hex stream  
   - Parsed flags (raw, decimal, binary, individual bits)
-```
+
   
 
-```
+
 
 ── Roof temp (t=0x30, 7 bytes) ──
 7E      ← Start
