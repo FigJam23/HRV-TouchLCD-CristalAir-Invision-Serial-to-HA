@@ -82,302 +82,112 @@ Verify RX/TX correctly connected.
 
 ## 🚀 Features
 
-- **Telemetry**  
+- **Telemetry**
+  **Multiple Controller Support**
   - House temperature  
-  - Roof temperature  
+  - Roof (remote) temperature
   - Control-panel setpoint  
   - Fan speed
-  - Humidity
-  - Raw packet hex
-  - Flags (raw, decimal, binary, individual bits)
-- **MQTT topics**  
-  ```cpp
-  #define HASSIOHRVSTATUS      "hassio/hrv/status"      // Alive heartbeat
-  #define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"   // House temp
-  #define HASSIOHRVSUBROOF     "hassio/hrv/rooftemp"    // Roof temp
-  #define HASSIOHRVSUBCONTROL  "hassio/hrv/controltemp" // Control-panel setpoint
-  #define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"    // Fan speed
-  #define HASSIOHRVRAW         "hassio/hrv/raw"         // Raw packet hex
-  #define HASSIOHRVHUMIDITY      "hassio/hrv/humidity"     // Scaled 0–100% RH
-  #define HASSIOHRVRAW           "hassio/hrv/raw"          // Raw packet hex
-  #define HASSIOHRVFLAGS_RAW     "hassio/hrv/flags_raw"    // Flags byte (hex)
-  #define HASSIOHRVFLAGS_DEC     "hassio/hrv/flags_dec"    // Flags (decimal)---
-  #define HASSIOHRVFLAGS_BIN     "hassio/hrv/flags_bin"    // Flags (binary string)
-  #define HASSIOHRVFLAGS_BIT     "hassio/hrv/flag/bit"     // Individual flag bits (append 0–7)
-  #define HASSIOHRVMANUAL        "hassio/hrv/manual"       // Manual command topic
+  - Humidity  
+  - Purge-sensor temperature  
+  - Summer-1 (roof-fan) temperature  
+  - Summer-2 (roof-fan) temperature  
+  - ATU 1 damper position (%)  
+  - ATU 2 damper position (%)  
+  - Heat-transfer coil temperature  
+  - HX-preheat coil temperature  
+
+- **Diagnostics & Raw Data**  
+  - Raw packet hex stream  
+  - Parsed flags (raw, decimal, binary, individual bits)
+```
   
-```
-⚡ ESP8266 Sketch
 
-#include <PubSubClient.h>
-#include <SoftwareSerial.h>
-#include <ESP8266WiFi.h>
-
-// HRV constants
-#define MSGSTARTSTOP 0x7E
-#define HRVROOF      0x30
-#define HRVHOUSE     0x31
-
-// MQTT topics
-#define HASSIOHRVSTATUS      "hassio/hrv/status"
-#define HASSIOHRVSUBHOUSE    "hassio/hrv/housetemp"
-#define HASSIOHRVSUBROOF     "hassio/hrv/rooftemp"
-#define HASSIOHRVSUBCONTROL  "hassio/hrv/controltemp"
-#define HASSIOHRVSUBFANSPEED "hassio/hrv/fanspeed"
-#define HASSIOHRVRAW         "hassio/hrv/raw"
-// Manual‐command topic
-#define HASSIOHRVMANUAL      "hassio/hrv/manual"
-
-// Forward declarations
-void    myDelay(int ms);
-void    startWIFI();
-String  decToHex(byte val, byte width);
-unsigned int hexToDec(String hex);
-void    SendMQTTMessage();
-void    mqttCallback(char* topic, byte* payload, unsigned int length);
-
-// Wi-Fi credentials
-const char* ssid     = "Reaver";
-const char* password = "Figjam";
-
-// MQTT broker
-IPAddress MQTT_SERVER(192, 168, 1, 44);
-const char* mqttUser     = "mqtt";
-const char* mqttPassword = "Just";
-
-// TTL HRV serial on D2=RX, D1=TX
-SoftwareSerial hrvSerial(D2, D1);
-
-// Packet parsing & state
-bool   bStarted        = false, bEnded = false;
-byte   inData[10], bIndex = 0, bChecksum = 0;
-float  fHRVTemp, fHRVLastRoof = 255, fHRVLastHouse = 255;
-int    iHRVControlTemp, iHRVFanSpeed, iHRVLastControl = 255, iHRVLastFanSpeed = 255;
-int    iTotalDelay     = 0;
-char   eTempLoc;
-
-WiFiClient   wifiClient;
-PubSubClient mqttClient(MQTT_SERVER, 1883, wifiClient);
-String       clientId;
-char         message_buff[16];
-String       pubString;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SETUP
-// ─────────────────────────────────────────────────────────────────────────────
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-
-  Serial.begin(115200);
-  hrvSerial.begin(1200);
-  myDelay(10);
-
-  // connect Wi-Fi & prep MQTT
-  startWIFI();
-  clientId = "hrv-" + WiFi.macAddress();
-  mqttClient.setServer(MQTT_SERVER, 1883);
-  mqttClient.setCallback(mqttCallback);
-  mqttClient.setKeepAlive(120);
-
-  // subscribe to manual hex commands
-  mqttClient.subscribe(HASSIOHRVMANUAL);
-
-  // reset parser state
-  bIndex     = 0;
-  bChecksum  = 0;
-  iTotalDelay= 0;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN LOOP
-// ─────────────────────────────────────────────────────────────────────────────
-void loop() {
-  // MQTT reconnect
-  if (!mqttClient.connected()) {
-    startWIFI();
-    while (!mqttClient.connect(clientId.c_str(), mqttUser, mqttPassword)) {
-      delay(2000);
-    }
-    mqttClient.subscribe(HASSIOHRVMANUAL);
-  }
-  mqttClient.loop();
-
-  // serial-data LED
-  digitalWrite(LED_BUILTIN, hrvSerial.available() ? HIGH : LOW);
-
-  // Read & buffer HRV bytes
-  while (hrvSerial.available() > 0) {
-    int c = hrvSerial.read();
-    if (c == MSGSTARTSTOP || bIndex > 8) {
-      if (bIndex == 0)        bStarted = true;
-      else { bChecksum = bIndex - 1; bEnded = true; break; }
-    }
-    if (bStarted) inData[bIndex++] = c;
-    myDelay(1);
-  }
-
-  // Validate checksum
-  if (bStarted && bEnded && bChecksum > 0) {
-    int sum = 0;
-    for (int i = 1; i < bChecksum; i++) sum -= inData[i];
-    byte calc = byte(sum % 0x100);
-    if (decToHex(calc,2) != decToHex(inData[bChecksum],2) || bIndex < 6) {
-      bStarted = bEnded = false;
-      bIndex = 0;
-      hrvSerial.flush();
-    }
-    bChecksum = 0;
-  }
-
-  // Process complete packet
-  if (bStarted && bEnded && bIndex > 5) {
-    String sHex1, sHex2;
-    for (int i = 1; i <= bIndex; i++) {
-      if      (i == 1)                           eTempLoc        = inData[i];
-      else if (i == 2)                           sHex1           = decToHex(inData[i],2);
-      else if (i == 3)                           sHex2           = decToHex(inData[i],2);
-      else if (eTempLoc == HRVHOUSE && i == 4)   iHRVFanSpeed    = inData[i];
-      else if (eTempLoc == HRVHOUSE && i == 5)   iHRVControlTemp = inData[i];
-    }
-    fHRVTemp = hexToDec(sHex1 + sHex2) * 0.0625;
-
-    // raw log
-    {
-      String raw;
-      for (int i = 0; i < bIndex; i++) {
-        if (inData[i] < 0x10) raw += "0";
-        raw += String(inData[i], HEX) + " ";
-      }
-      raw.toUpperCase();
-      mqttClient.publish(HASSIOHRVRAW, raw.c_str());
-    }
-
-    SendMQTTMessage();
-
-    bStarted = bEnded = false;
-    bIndex = 0;
-  }
-  else {
-    myDelay(2000);
-  }
-
-  // still-alive ping
-  if (WiFi.status()==WL_CONNECTED && mqttClient.connected() && iTotalDelay >= 30000) {
-    mqttClient.publish(HASSIOHRVSTATUS, "1");
-    iTotalDelay = 0;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MQTT CALLBACK — write manual hex back to HRV
-// ─────────────────────────────────────────────────────────────────────────────
-void mqttCallback(char* topic, byte* payload, unsigned int len) {
-  if (String(topic) != HASSIOHRVMANUAL) return;
-  String msg;
-  for (unsigned int i=0; i<len; i++) msg += char(payload[i]);
-  msg.trim();
-  // parse "AA BB CC ..." into bytes
-  int idx = 0;
-  while (idx < msg.length()-1) {
-    String hexByte = msg.substring(idx, idx+2);
-    byte b = strtoul(hexByte.c_str(), nullptr, 16);
-    hrvSerial.write(b);
-    idx += 2;
-    // skip spaces
-    while (idx<msg.length() && !isHexadecimalDigit(msg[idx])) idx++;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-String decToHex(byte val, byte width) {
-  String s = String(val, HEX);
-  while (s.length() < width) s = "0" + s;
-  return s;
-}
-unsigned int hexToDec(String hex) {
-  unsigned int v = 0;
-  for (char c : hex) {
-    int d = isdigit(c) ? c - '0'
-          : isupper(c) ? c - 'A' + 10
-          : islower(c) ? c - 'a' + 10
-          : 0;
-    v = v*16 + d;
-  }
-  return v;
-}
-void SendMQTTMessage() {
-  if (WiFi.status() != WL_CONNECTED || !mqttClient.connected()) return;
-
-  // publish temps
-  int tmp = int(fHRVTemp*2 + 0.5);
-  fHRVTemp = tmp/2.0;
-  pubString = String(fHRVTemp);
-  pubString.toCharArray(message_buff, pubString.length()+1);
-  if (eTempLoc==HRVHOUSE && fHRVTemp!=fHRVLastHouse) {
-    fHRVLastHouse = fHRVTemp;
-    mqttClient.publish(HASSIOHRVSUBHOUSE, message_buff);
-  } else if (eTempLoc==HRVROOF && fHRVTemp!=fHRVLastRoof) {
-    fHRVLastRoof = fHRVTemp;
-    mqttClient.publish(HASSIOHRVSUBROOF, message_buff);
-  }
-
-  // publish control setpoint
-  if (iHRVControlTemp!=iHRVLastControl || iHRVLastFanSpeed==255) {
-    pubString = String(iHRVControlTemp);
-    pubString.toCharArray(message_buff, pubString.length()+1);
-    iHRVLastControl = iHRVControlTemp;
-    mqttClient.publish(HASSIOHRVSUBCONTROL, message_buff);
-  }
-
-  // publish fan speed
-  if (iHRVFanSpeed!=iHRVLastFanSpeed ||
-      iHRVControlTemp!=iHRVLastControl ||
-      (eTempLoc==HRVHOUSE && fHRVTemp!=fHRVLastHouse) ||
-      (eTempLoc==HRVROOF  && fHRVTemp!=fHRVLastRoof))
-  {
-    iHRVLastFanSpeed = iHRVFanSpeed;
-    if      (iHRVFanSpeed==0)   pubString = "Off";
-    else if (iHRVFanSpeed==5)   pubString = "Idle";
-    else if (iHRVFanSpeed==100) pubString = "Full";
-    else                        pubString = String(iHRVFanSpeed) + "%";
-    pubString.toCharArray(message_buff, pubString.length()+1);
-    mqttClient.publish(HASSIOHRVSUBFANSPEED, message_buff);
-  }
-
-  // flash LED
-  digitalWrite(LED_BUILTIN, LOW);  myDelay(50);
-  digitalWrite(LED_BUILTIN, HIGH); myDelay(1000);
-}
-void myDelay(int ms) {
-  for (int i = 1; i <= ms; i++) {
-    delay(1);
-    if (i % 100 == 0) {
-      ESP.wdtFeed();
-      mqttClient.loop();
-      yield();
-    }
-  }
-  iTotalDelay += ms;
-}
-void startWIFI() {
-  if (WiFi.status()==WL_CONNECTED) return;
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  WiFi.begin(ssid, password);
-  int tries = 0;
-  while (WiFi.status()!=WL_CONNECTED) {
-    delay(2000);
-    if (++tries > 450) ESP.reset();
-  }
-  myDelay(1500);
-}
 ```
 
+── Roof temp (t=0x30, 7 bytes) ──
+7E      ← Start
+0x30    ← t = 0x30 (roof/remote temp)
+0x00    ← sensor-ID = 0 (roof)
+0xCF    ← raw temp high byte
+0x00    ← raw temp low  byte   (raw = 0x00CF → 207 × 0.0625 = 12.9 °C)
+0x01    ← checksum
+7E      ← End
 
-MIT © Mike Figjam
+── House temp + fan + setpoint (t=0x31, 10 bytes) ──
+7E      ← Start
+0x31    ← t = 0x31 (house/keypad)
+0x01    ← sensor-ID = 1 (house)
+0x6D    ← raw temp high byte
+0x00    ← raw temp low  byte   (raw = 0x6D00 → 27904 × 0.0625 = 1744 °C*?)  
+           *only bytes 3–4 form temp; low nibble often zero 
+0x1E    ← fan speed = 0x1E (30 %)
+0x14    ← setpoint = 0x14 (20 °C)
+0x84    ← fixed payload
+0x70    ← fixed payload
+0x47    ← checksum
+7E      ← End
 
+── Purge sensor temp (t=0x32, 7 bytes) ──
+7E    
+0x32    ← t = 0x32 (purge temp)
+0x00    ← sensor-ID = 0 (roof/purge)
+0xXX    ← raw temp high byte
+0xXX    ← raw temp low  byte   (× 0.0625 °C)
+0xYY    ← checksum
+7E      
 
+── Summer-1 roof-fan temp (t=0x33, 7 bytes) ──
+7E    
+0x33    ← t = 0x33 (summer 1)
+0x00    ← sensor-ID = 0
+0xXX    ← raw temp high byte
+0xXX    ← raw temp low  byte
+0xYY    ← checksum
+7E      
 
+── Summer-2 roof-fan temp (t=0x34, 7 bytes) ──
+7E    
+0x34    ← t = 0x34 (summer 2)
+0x00    ← sensor-ID = 0
+0xXX
+0xXX
+0xYY
+7E      
+
+── ATU 1 damper % (t=0x35, 7 bytes) ──
+7E    
+0x35    ← t = 0x35 (ATU 1)
+0x00    ← sensor-ID = 0
+0xXX    ← high byte (0x00 usually)
+0xXX    ← low byte  (→ % open)
+0xYY    ← checksum
+7E      
+
+── ATU 2 damper % (t=0x36, 7 bytes) ──
+7E    
+0x36    ← t = 0x36 (ATU 2)
+0x00
+0xXX
+0xXX
+0xYY
+7E      
+
+── Heat-transfer coil temp (t=0x37, 7 bytes) ──
+7E    
+0x37    ← t = 0x37 (coil temp)
+0x01    ← sensor-ID = 1 (coil)
+0x6C    ← raw temp high byte
+0x00    ← raw temp low  byte   (raw = 0x6C00)
+0x??    ← checksum
+7E      
+
+── HX-preheat coil temp (t=0x38, 7 bytes) ──
+7E    
+0x38    ← t = 0x38 (HX coil)
+0x00    ← sensor-ID = 0
+0x00    ← high byte
+0xC8    ← low byte (200 × 0.0625 = 12.5 °C)
+0x??    ← checksum
+7E
+```
