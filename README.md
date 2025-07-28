@@ -88,7 +88,6 @@ Verify RX/TX correctly connected.
   - Roof (remote) temperature
   - Control-panel setpoint  
   - Fan speed
-  - Humidity  
   - Purge-sensor temperature  
   - Summer-1 (roof-fan) temperature  
   - Summer-2 (roof-fan) temperature  
