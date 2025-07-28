@@ -102,7 +102,7 @@ Verify RX/TX correctly connected.
 
   
 
-
+```
 
 ── Roof temp (t=0x30, 7 bytes) ──
 7E      ← Start
