@@ -42,15 +42,34 @@ mqtt:
   discovery: true
   topic_prefix: "hassio/hrv"
   keepalive: 60s
+
   on_connect:
     - lambda: |-
-        id(last_house_temp)=255;
-        id(last_roof_temp)=255;
-        id(last_setpoint)=255;
-        id(last_fan_speed)=255;
+        // reset our live‐data markers
+        id(last_house_temp) = 255;
+        id(last_roof_temp ) = 255;
+        id(last_setpoint  ) = 255;
+        id(last_fan_speed ) = 255;
   on_disconnect:
     - lambda: |-
         ESP_LOGD("MQTT","Disconnected");
+
+  # subscribe to retained filter topics so we pick up the last known state
+  on_message:
+    - topic: "hassio/hrv/filter_days_remaining/state"
+      qos: 1
+      then:
+        - lambda: |-
+            int d = atoi(x.c_str());
+            id(hrv_days_remaining) = d;
+            id(hrv_filter_days_remaining).publish_state(d);
+            id(hrv_filter_life).publish_state(round(d * 100.0f / 730.0f));
+    - topic: "hassio/hrv/filter_life/state"
+      qos: 1
+      then:
+        - lambda: |-
+            int lf = atoi(x.c_str());
+            id(hrv_filter_life).publish_state(lf);
 
 output:
   - platform: gpio
@@ -95,6 +114,7 @@ globals:
     initial_value: "15000"
   - id: hrv_days_remaining
     type: int
+    restore_value: yes
     initial_value: "730"  # full filter life
 
 # ───────── Sensors ─────────
@@ -149,13 +169,10 @@ number:
     optimistic: true
     restore_value: yes
     set_action:
-      # 1) update internal counter
       - lambda: |-
           id(hrv_days_remaining) = (int)x;
-          // immediately update both UI entities
           id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
           id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/730.0));
-      # 2) mirror to MQTT
       - mqtt.publish:
           topic: "hassio/hrv/filter_days_remaining/state"
           payload: !lambda 'return to_string(id(hrv_days_remaining));'
@@ -177,12 +194,10 @@ button:
     name: "HRV Filter Reset"
     icon: "mdi:restart"
     on_press:
-      # reset counter
       - lambda: |-
           id(hrv_days_remaining) = 730;
           id(hrv_filter_days_remaining).publish_state(730);
           id(hrv_filter_life).publish_state(100);
-      # publish to MQTT
       - mqtt.publish:
           topic: "hassio/hrv/filter_days_remaining/state"
           payload: "730"
@@ -210,12 +225,9 @@ binary_sensor:
   - platform: template
     name: "HRV Keypad On Off State"
     id: hrv_keypad_on
-    device_class: power  
+    device_class: power
     lambda: |-
-      // returns true (ON) when fan speed > 0, false (OFF) when fan speed == 0
       return id(hrv_fan_speed).state > 0;
-     
-
 
 # ───────── Scripts ─────────
 script:
@@ -237,22 +249,19 @@ script:
               if ((uint8_t)(sum & 0xFF) == frame[cks]) {
                 uint8_t t = frame[1];
                 if (t == 0x31 && frame.size() == 10) {
-                  // House temp
-                  uint16_t r = (frame[2] << 8) | frame[3];
-                  float tmp = r * 0.0625f;
+                  uint16_t raw = (frame[2] << 8) | frame[3];
+                  float tmp = raw * 0.0625f;
                   if (tmp >= 0 && tmp <= 45) {
                     id(last_house_temp) = round(tmp*10)/10.0f;
                     id(ts_house) = millis();
                     id(hrv_house_temp).publish_state(id(last_house_temp));
                   }
-                  // Fan speed
                   int fan = frame[4];
                   if (fan >= 0 && fan <= 100) {
                     id(last_fan_speed) = fan;
                     id(ts_fan) = millis();
                     id(hrv_fan_speed).publish_state(fan);
                   }
-                  // Setpoint
                   int sp = frame[5];
                   if (sp >= 14 && sp <= 30) {
                     id(last_setpoint) = sp;
@@ -260,9 +269,8 @@ script:
                     id(hrv_setpoint).publish_state(sp);
                   }
                 } else if (t == 0x30 && frame.size() == 7) {
-                  // Roof temp
-                  uint16_t r = (frame[2] << 8) | frame[3];
-                  float tmp = r * 0.0625f;
+                  uint16_t raw = (frame[2] << 8) | frame[3];
+                  float tmp = raw * 0.0625f;
                   if (tmp >= 0 && tmp <= 45) {
                     id(last_roof_temp) = round(tmp*10)/10.0f;
                     id(ts_roof) = millis();
@@ -297,9 +305,7 @@ interval:
   - interval: 24h
     then:
       - lambda: |-
-          if (id(hrv_days_remaining) > 0)
-            id(hrv_days_remaining)--; 
-          // update UI
+          if (id(hrv_days_remaining) > 0) id(hrv_days_remaining)--;
           id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
           id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/730.0));
       - mqtt.publish:
