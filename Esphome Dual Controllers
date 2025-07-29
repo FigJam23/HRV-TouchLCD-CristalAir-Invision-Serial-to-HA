@@ -42,8 +42,10 @@ mqtt:
   discovery: true
   topic_prefix: "hassio/hrv"
   keepalive: 60s
+
   on_connect:
     - lambda: |-
+        // reset our raw-data markers, but retained filter values will come in via subscriptions
         id(last_house_temp)   = 255;
         id(last_roof_temp)    = 255;
         id(last_fan_speed)    = 255;
@@ -52,9 +54,29 @@ mqtt:
         id(last_roof_temp_2)  = 255;
         id(last_fan_speed_2)  = 255;
         id(last_setpoint_2)   = 255;
+
   on_disconnect:
     - lambda: |-
         ESP_LOGD("MQTT","Disconnected");
+
+  on_message:
+    - topic: "hassio/hrv/filter_days_remaining/state"
+      qos: 1
+      then:
+        - lambda: |-
+            // parse incoming retained days remaining
+            int days = atoi(x.c_str());
+            id(hrv_days_remaining) = days;
+            // update UI & derived life%
+            id(hrv_filter_days_remaining).publish_state(days);
+            id(hrv_filter_life).publish_state(round(days * 100.0f / 730.0f));
+    - topic: "hassio/hrv/filter_life/state"
+      qos: 1
+      then:
+        - lambda: |-
+            // if you ever publish life% independently, update the sensor too
+            int life = atoi(x.c_str());
+            id(hrv_filter_life).publish_state(life);
 
 output:
   - platform: gpio
@@ -166,6 +188,7 @@ sensor:
     icon: "mdi:air-filter"
     accuracy_decimals: 0
     lambda: |-
+      // derived from days remaining
       return (int)round(id(hrv_days_remaining) * 100.0f / 730.0f);
 
   - platform: wifi_signal
@@ -270,8 +293,6 @@ binary_sensor:
     lambda: |-
       // returns true (ON) when fan speed > 0, false (OFF) when fan speed == 0
       return id(hrv_fan_speed).state > 0;
-     
-
 
 switch:
   - platform: template
