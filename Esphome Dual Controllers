@@ -127,7 +127,7 @@ globals:
   - id: hrv_days_remaining
     type: int
     restore_value: yes
-    initial_value: "365"
+    initial_value: "730"
   - id: second_enabled
     type: bool
     initial_value: "false"
@@ -166,7 +166,7 @@ sensor:
     icon: "mdi:air-filter"
     accuracy_decimals: 0
     lambda: |-
-      return (int)round(id(hrv_days_remaining) * 100.0f / 365.0f);
+      return (int)round(id(hrv_days_remaining) * 100.0f / 730.0f);
 
   - platform: wifi_signal
     name: "HRV WiFi Signal"
@@ -205,7 +205,7 @@ number:
     name: "HRV Filter Days Remaining"
     id: hrv_filter_days_remaining
     min_value: 0
-    max_value: 365
+    max_value: 730
     step: 1
     optimistic: true
     restore_value: yes
@@ -213,7 +213,7 @@ number:
       - lambda: |-
           id(hrv_days_remaining) = (int)x;
           id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
-          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/365.0));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/730.0));
       - mqtt.publish:
           topic: "hassio/hrv/filter_days_remaining/state"
           payload: !lambda 'return to_string(id(hrv_days_remaining));'
@@ -221,7 +221,7 @@ number:
           retain: true
       - mqtt.publish:
           topic: "hassio/hrv/filter_life/state"
-          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/365.0));'
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/730.0));'
           qos: 1
           retain: true
       - mqtt.publish:
@@ -236,12 +236,12 @@ button:
     icon: "mdi:restart"
     on_press:
       - lambda: |-
-          id(hrv_days_remaining) = 365;
-          id(hrv_filter_days_remaining).publish_state(365);
+          id(hrv_days_remaining) = 730;
+          id(hrv_filter_days_remaining).publish_state(730);
           id(hrv_filter_life).publish_state(100);
       - mqtt.publish:
           topic: "hassio/hrv/filter_days_remaining/state"
-          payload: "365"
+          payload: "730"
           qos: 1
           retain: true
       - mqtt.publish:
@@ -371,7 +371,7 @@ interval:
       - lambda: |-
           if (id(hrv_days_remaining) > 0) id(hrv_days_remaining)--;
           id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
-          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/365.0));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining)*100.0/730.0));
       - mqtt.publish:
           topic: "hassio/hrv/filter_days_remaining/state"
           payload: !lambda 'return to_string(id(hrv_days_remaining));'
@@ -379,7 +379,7 @@ interval:
           retain: true
       - mqtt.publish:
           topic: "hassio/hrv/filter_life/state"
-          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/365.0));'
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining)*100.0/730.0));'
           qos: 1
           retain: true
       - mqtt.publish:
