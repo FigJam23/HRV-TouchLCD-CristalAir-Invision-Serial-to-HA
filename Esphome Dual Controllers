@@ -294,68 +294,59 @@ script:
           static std::vector<uint8_t> frame;
           while (id(hrv_uart).available()) {
             uint8_t b; id(hrv_uart).read_byte(&b);
+            // start of frame
             if (frame.empty()) {
               if (b == 0x7E) frame.push_back(b);
               continue;
             }
             frame.push_back(b);
-            if (frame.back() == 0x7E && frame.size() >= 7) {
-              size_t cks = frame.size() - 2;
+            // end of frame
+            if (b == 0x7E && frame.size() >= 7) {
+              // verify checksum
+              size_t cks_idx = frame.size() - 2;
               int sum = 0;
-              for (size_t i = 1; i < cks; ++i) sum -= frame[i];
-              if ((uint8_t)(sum & 0xFF) == frame[cks]) {
-                uint8_t t = frame[1];
-                uint8_t sensor_id = frame[2];
-                if (sensor_id == 2 && !id(second_enabled)) {
-                  id(second_enabled) = true;
-                  id(second_enabled_switch).publish_state(true);
-                }
-                if (sensor_id == 1 || (sensor_id == 2 && id(second_enabled))) {
-                  auto &last_ht = sensor_id == 1 ? id(last_house_temp) : id(last_house_temp_2);
-                  auto &ts_ht   = sensor_id == 1 ? id(ts_house)       : id(ts_house_2);
-                  auto &last_rt = sensor_id == 1 ? id(last_roof_temp) : id(last_roof_temp_2);
-                  auto &ts_rt   = sensor_id == 1 ? id(ts_roof)        : id(ts_roof_2);
-                  auto &last_fs = sensor_id == 1 ? id(last_fan_speed) : id(last_fan_speed_2);
-                  auto &ts_fs   = sensor_id == 1 ? id(ts_fan)         : id(ts_fan_2);
-                  auto &last_sp = sensor_id == 1 ? id(last_setpoint)  : id(last_setpoint_2);
-                  auto &ts_sp   = sensor_id == 1 ? id(ts_setpoint)    : id(ts_setpoint_2);
-
-                  if (t == 0x31 && frame.size() == 10) {
-                    float tmp = ((frame[2] << 8) | frame[3]) * 0.0625f;
-                    if (tmp >= 0 && tmp <= 45) {
-                      last_ht = round(tmp * 10) / 10.0f;
-                      ts_ht = millis();
-                      if (sensor_id == 1) id(hrv_house_temp).publish_state(last_ht);
-                      else id(hrv_house_temp_2).publish_state(last_ht);
-                    }
-                    int fan = frame[4];
-                    if (fan >= 0 && fan <= 100) {
-                      last_fs = fan;
-                      ts_fs = millis();
-                      if (sensor_id == 1) id(hrv_fan_speed).publish_state(fan);
-                      else id(hrv_fan_speed_2).publish_state(fan);
-                    }
-                    int sp = frame[5];
-                    if (sp >= 14 && sp <= 30) {
-                      last_sp = sp;
-                      ts_sp = millis();
-                      if (sensor_id == 1) id(hrv_setpoint).publish_state(sp);
-                      else id(hrv_setpoint_2).publish_state(sp);
-                    }
+              for (size_t i = 1; i < cks_idx; ++i) sum -= frame[i];
+              if ((uint8_t)(sum & 0xFF) == frame[cks_idx]) {
+                uint8_t type = frame[1];
+                // ─── House frame: 10 bytes ───
+                if (type == 0x31 && frame.size() == 10) {
+                  // temperature
+                  uint16_t rawHT = (uint16_t(frame[2]) << 8) | frame[3];
+                  float tmpHT = rawHT * 0.0625f;
+                  if (tmpHT >= 0 && tmpHT <= 45) {
+                    id(last_house_temp) = round(tmpHT * 10) / 10.0f;
+                    id(ts_house) = millis();
+                    id(hrv_house_temp).publish_state(id(last_house_temp));
                   }
-                  else if (t == 0x30 && frame.size() == 7) {
-                    float tmp = ((frame[2] << 8) | frame[3]) * 0.0625f;
-                    if (tmp >= 0 && tmp <= 45) {
-                      last_rt = round(tmp * 10) / 10.0f;
-                      ts_rt = millis();
-                      if (sensor_id == 1) id(hrv_roof_temp).publish_state(last_rt);
-                      else id(hrv_roof_temp_2).publish_state(last_rt);
-                    }
+                  // fan speed
+                  int fan = frame[4];
+                  if (fan >= 0 && fan <= 100) {
+                    id(last_fan_speed) = fan;
+                    id(ts_fan) = millis();
+                    id(hrv_fan_speed).publish_state(fan);
+                  }
+                  // setpoint
+                  int sp = frame[5];
+                  if (sp >= 14 && sp <= 30) {
+                    id(last_setpoint) = sp;
+                    id(ts_setpoint) = millis();
+                    id(hrv_setpoint).publish_state(sp);
+                  }
+                }
+                // ─── Roof frame: 7 bytes ───
+                else if (type == 0x30 && frame.size() == 7) {
+                  uint16_t rawRT = (uint16_t(frame[2]) << 8) | frame[3];
+                  float tmpRT = rawRT * 0.0625f;
+                  if (tmpRT >= 0 && tmpRT <= 45) {
+                    id(last_roof_temp) = round(tmpRT * 10) / 10.0f;
+                    id(ts_roof) = millis();
+                    id(hrv_roof_temp).publish_state(id(last_roof_temp));
                   }
                 }
               }
               frame.clear();
             }
+            // sanity clear
             if (frame.size() > 24) frame.clear();
           }
 
@@ -363,14 +354,10 @@ script:
     then:
       - lambda: |-
           uint32_t now = millis(), to = id(sensor_timeout_ms);
-          if (now - id(ts_house) > to) id(hrv_house_temp).publish_state(0);
-          if (now - id(ts_roof)  > to) id(hrv_roof_temp).publish_state(0);
-          if (now - id(ts_fan)   > to) id(hrv_fan_speed).publish_state(0);
-          if (now - id(ts_setpoint) > to) id(hrv_setpoint).publish_state(0);
-          if (now - id(ts_house_2) > to) id(hrv_house_temp_2).publish_state(0);
-          if (now - id(ts_roof_2)  > to) id(hrv_roof_temp_2).publish_state(0);
-          if (now - id(ts_fan_2)   > to) id(hrv_fan_speed_2).publish_state(0);
-          if (now - id(ts_setpoint_2) > to) id(hrv_setpoint_2).publish_state(0);
+          if (now - id(ts_house)     > to) id(hrv_house_temp).publish_state(0);
+          if (now - id(ts_roof)      > to) id(hrv_roof_temp).publish_state(0);
+          if (now - id(ts_fan)       > to) id(hrv_fan_speed).publish_state(0);
+          if (now - id(ts_setpoint)  > to) id(hrv_setpoint).publish_state(0);
 
 interval:
   - interval: 80ms
