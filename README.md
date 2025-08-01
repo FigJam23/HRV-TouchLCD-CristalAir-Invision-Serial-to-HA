@@ -18,24 +18,14 @@ https://manuals.plus/hrv/3843-classic-controller-manual
 <!-- Diagram Gallery -->
 <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1em; margin: 1em 0;">
   <!-- Wiring Diagrams -->
-  <img src="https://github.com/user-attachments/assets/18cdaeea-f2a3-4aa9-b0f8-0c1edc792d2e"
-       alt="Wiring Diagram 1" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/ccee0cb8-b140-4ca7-a427-a638f3edf10d"
-       alt="Wiring Diagram 2" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
-       alt="Wiring Diagram 3" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/97caabfe-2dc7-4d4e-9f41-9ce7b2998c1b"
-       alt="Wiring Diagram 4" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-
-  <!-- Keypad & Panel Photos -->
   <img src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
        alt="Keypad Front" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/b531c781-9883-452b-a60a-4e2915d84bfc"
-       alt="Keypad Side" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/54a392a8-dd67-4ae8-b280-1a8e3a5bad53"
-       alt="Controller Board" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-  <img src="https://github.com/user-attachments/assets/a4ae7874-3845-4d50-89f5-def81adb40fe"
-       alt="Diagnostic Screen" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
+ 
+
+  <img src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
+       alt="Wiring Diagram 3" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
+
+
 </div>
 
 
