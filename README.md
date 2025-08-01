@@ -13,20 +13,38 @@ https://manuals.plus/hrv/3843-classic-controller-manual
 - 1 cap
 - Optional: buck converter if you switch to an external 5 V supply
 
+<!-- Diagram Gallery: last image first -->
+<table align="center">
+  <tr>
+    <!-- Position 1: the previously “last” image -->
+    <td>
+      <img
+        src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30"
+        alt="Third Diagram"
+        width="200"
+      />
+    </td>
+    <!-- Position 2: Keypad Front -->
+    <td>
+      <img
+        src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
+        alt="Keypad Front"
+        width="200"
+      />
+    </td>
+    <!-- Position 3: Wiring Diagram 3 -->
+    <td>
+      <img
+        src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
+        alt="Wiring Diagram 3"
+        width="200"
+      />
+    </td>
+  </tr>
+</table>
 
 
-<!-- Diagram Gallery -->
-<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1em; margin: 1em 0;">
-  <!-- Wiring Diagrams -->
-  <img src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
-       alt="Keypad Front" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
- 
 
-  <img src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
-       alt="Wiring Diagram 3" style="flex: 1 1 200px; max-width: 23%; height: auto;" />
-
-
-</div>
 
 
 
