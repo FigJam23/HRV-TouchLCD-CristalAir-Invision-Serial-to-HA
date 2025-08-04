@@ -1,0 +1,62 @@
+esphome:
+  name: figjam-hrv
+  friendly_name: FIGJAM HRV
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+uart:
+  id: hrv_uart
+  tx_pin:
+    number: D1
+    inverted: true    # open-collector bus idle=HIGH
+  rx_pin:
+    number: D2
+    inverted: true
+  baud_rate: 1200
+  data_bits: 8       # or try 7 if needed
+  parity: NONE       # or EVEN for 7E1/7E2
+  stop_bits: 1
+  # no `debug:` section
+
+interval:
+  - interval: 10ms
+    then:
+      - lambda: |-
+          static std::string frame;
+          while (id(hrv_uart).available()) {
+            uint8_t b;
+            id(hrv_uart).read_byte(&b);
+            if (b == 0xA0) {
+              // If we have an existing buffer, log it first
+              if (!frame.empty()) {
+                ESP_LOGI("HRV_SNIFF", "A0-Frame: %s", frame.c_str());
+              }
+              frame = "A0 ";  // start new frame
+            } else {
+              char buf[6];
+              sprintf(buf, "%02X ", b);
+              frame += buf;
+            }
+          }
