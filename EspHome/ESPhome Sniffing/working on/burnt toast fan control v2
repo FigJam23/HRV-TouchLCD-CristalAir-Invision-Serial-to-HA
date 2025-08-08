@@ -1,0 +1,365 @@
+esphome:
+  name: hrv_keypad
+  friendly_name: HRV Keypad Emulator
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "FigjamDilligaf74"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway:   192.168.1.1
+    subnet:    255.255.255.0
+  power_save_mode: none
+  fast_connect: true
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+
+uart:
+  id: bus
+  tx_pin: D1
+  rx_pin: D2
+  baud_rate: 1200
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+  debug:
+    direction: BOTH
+
+# ───────────────────────────────────────────────────────────────────────────────
+# TX/RX pretty print
+# ───────────────────────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: template
+    id: last_tx
+    name: "Last TX Frame"
+  - platform: template
+    id: last_rx
+    name: "Last RX Frame"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# State/flags for waiting + keepalive
+# ───────────────────────────────────────────────────────────────────────────────
+globals:
+  - id: rx_seen
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: rx_b0
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: rx_b1
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: burnt_hold
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: last_ack_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: keepalive_period_ms
+    type: int
+    restore_value: no
+    initial_value: '900'   # ~0.9s cadence (matches your capture feel)
+
+# ───────────────────────────────────────────────────────────────────────────────
+# RX assembler: sets rx_seen + captures first two body bytes
+# ───────────────────────────────────────────────────────────────────────────────
+script:
+  - id: process_rx
+    mode: single
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> buf;
+          auto u = id(bus);
+          while (u->available()) {
+            uint8_t b; u->read_byte(&b);
+            if (buf.empty()) { if (b==0x7E) buf.push_back(b); continue; }
+            buf.push_back(b);
+            if (b==0x7E && buf.size() >= 5) {
+              // checksum
+              size_t ci = buf.size() - 2;
+              int sum = 0; for (size_t i=1;i<ci;i++) sum -= buf[i];
+              bool ok = ((uint8_t)(sum & 0xFF)) == buf[ci];
+
+              std::string s; char tmp[4];
+              for (auto x: buf){ sprintf(tmp,"%02X ", x); s += tmp; }
+              id(last_rx).publish_state(s);
+
+              if (ok) {
+                id(rx_b0) = buf.size()>1 ? buf[1] : 0;
+                id(rx_b1) = buf.size()>2 ? buf[2] : 0;
+                id(rx_seen) = true;
+                // update ACK timestamp if 30 01 ...
+                if (id(rx_b0)==0x30 && id(rx_b1)==0x01) {
+                  id(last_ack_ms) = millis();
+                }
+              }
+              buf.clear();
+            }
+            if (buf.size() > 64) buf.clear();
+          }
+
+  # Re-handshake (gated waits): 4x 36, 4x 38, 4x 46
+  - id: rehandshake
+    mode: restart
+    then:
+      - lambda: |-
+          auto send = [&](std::initializer_list<uint8_t> body){
+            auto u = id(bus);
+            std::vector<uint8_t> f{0x7E};
+            f.insert(f.end(), body.begin(), body.end());
+            int sum=0; for(size_t i=1;i<f.size(); ++i) sum -= f[i];
+            f.push_back((uint8_t)sum); f.push_back(0x7E);
+            std::string s; char tmp[4];
+            for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; u->write_byte(v); }
+            id(last_tx).publish_state(s);
+          };
+          auto wait_any = [&](uint32_t ms_timeout)->bool{
+            id(rx_seen)=false;
+            uint32_t t0 = millis();
+            while (!id(rx_seen) && (millis()-t0 < ms_timeout)) { delay(1); yield(); }
+            return id(rx_seen);
+          };
+
+          for (int i=0;i<4;i++){ send({0x36,0x00,0x00,0x00}); wait_any(300); }
+          for (int i=0;i<4;i++){ send({0x38,0x00,0x00,0x00}); wait_any(300); }
+          for (int i=0;i<4;i++){ send({0x46,0x00,0x00,0x00}); wait_any(300); }
+
+# Poll RX every 10ms
+interval:
+  - interval: 10ms
+    then:
+      - script.execute: process_rx
+
+# Keepalive tick while burnt_hold is true (send 31 01 50 64 ...)
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (!id(burnt_hold)) return;
+          static uint32_t last_sent = 0;
+          if (millis() - last_sent < (uint32_t)id(keepalive_period_ms)) return;
+
+          auto u = id(bus);
+          // Body of "100%" step from your capture: 31 01 50 64 1E 84 F0
+          std::vector<uint8_t> body{0x31,0x01,0x50,0x64,0x1E,0x84,0xF0};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char tmp[4];
+          for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+          last_sent = millis();
+
+# Watchdog: if we haven't seen a 0x30 01 ack in >3s while holding, re-handshake
+  - interval: 2s
+    then:
+      - lambda: |-
+          if (!id(burnt_hold)) return;
+          uint32_t now = millis();
+          if (id(last_ack_ms) == 0 || (now - id(last_ack_ms)) > 3000) {
+            ESP_LOGW("KP_WD","No 0x30 01 ACK >3s; rehandshake");
+            id(last_ack_ms) = now;  // avoid spamming while we rehandshake
+            // Kick a rehandshake (non-blocking outside; script yields inside)
+            id(rehandshake).execute();
+          }
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Manual buttons + sequences
+# ───────────────────────────────────────────────────────────────────────────────
+button:
+  - platform: template
+    name: "Ack 0x41 E3"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x41,0xE3};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Req 0x36"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x36,0x00,0x00,0x00};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Req 0x38 C8"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x38,0x00,0x00,0x00};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Req 0x46 BA"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x46,0x00,0x00,0x00};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Poll 31 01 72"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x31,0x01,0x72,0x00,0x1E,0x84,0x70,0x4A};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Poll 31 01 74"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x31,0x01,0x74,0x00,0x1E,0x84,0x70,0x48};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  - platform: template
+    name: "Poll 31 01 75"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x31,0x01,0x75,0x00,0x1E,0x84,0x70,0x47};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size();++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char b[4];
+          for (auto v: f){ sprintf(b,"%02X ",v); s+=b; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+
+  # Burnt toast replicating ramp (your long list), once
+  - platform: template
+    name: "Burnt Toast → 100% (replicate)"
+    on_press:
+      - lambda: |-
+          auto send = [&](std::initializer_list<uint8_t> body){
+            auto u = id(bus);
+            std::vector<uint8_t> f{0x7E};
+            f.insert(f.end(), body.begin(), body.end());
+            int sum=0; for(size_t i=1;i<f.size(); ++i) sum -= f[i];
+            f.push_back((uint8_t)sum); f.push_back(0x7E);
+            std::string s; char tmp[4];
+            for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; u->write_byte(v); }
+            id(last_tx).publish_state(s);
+          };
+          auto wait_ack_30 = [&](uint32_t ms_timeout)->bool{
+            id(rx_seen)=false;
+            uint32_t t0 = millis();
+            while (millis()-t0 < ms_timeout) {
+              if (id(rx_seen) && id(rx_b0)==0x30 && id(rx_b1)==0x01) { id(last_ack_ms)=millis(); return true; }
+              delay(1); yield();
+            }
+            return false;
+          };
+          struct Cmd { uint8_t code; uint8_t val; };
+          const Cmd steps[] = {
+            {0x4E,0x0A}, {0x4E,0x0F}, {0x4E,0x14}, {0x4E,0x19}, {0x4E,0x1E},
+            {0x4F,0x23}, {0x4E,0x28}, {0x4E,0x2D},
+            {0x4F,0x32}, {0x4F,0x34}, {0x4F,0x36}, {0x4F,0x38},
+            {0x4F,0x3A}, {0x4F,0x3C}, {0x4F,0x3E}, {0x4F,0x40}, {0x4F,0x42},
+            {0x4F,0x44}, {0x4F,0x46}, {0x4F,0x48}, {0x4F,0x4A},
+            {0x50,0x4C}, {0x4F,0x4E}, {0x50,0x50}, {0x4F,0x52},
+            {0x50,0x54}, {0x50,0x56}, {0x4F,0x58}, {0x4F,0x5A},
+            {0x4F,0x5C}, {0x4F,0x5E}, {0x4F,0x60}, {0x4F,0x62}, {0x4F,0x64},
+            {0x50,0x64}
+          };
+          for (auto &st : steps) {
+            send({0x31,0x01, st.code, st.val, 0x1E, 0x84, 0xF0});
+            wait_ack_30(250);
+            delay(60);
+          }
+
+  # Burnt toast jump once
+  - platform: template
+    name: "Burnt Toast → 100% (jump)"
+    on_press:
+      - lambda: |-
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x31,0x01,0x50,0x64,0x1E,0x84,0xF0};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char tmp[4];
+          for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+
+  # Start holding at 100%: periodic keepalive + watchdog
+  - platform: template
+    name: "Burnt Toast HOLD (start)"
+    on_press:
+      - lambda: |-
+          id(burnt_hold) = true;
+          // send one immediately so we don't wait for the next tick
+          auto u = id(bus);
+          std::vector<uint8_t> body{0x31,0x01,0x50,0x64,0x1E,0x84,0xF0};
+          std::vector<uint8_t> f{0x7E}; f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for(size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          std::string s; char tmp[4];
+          for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; u->write_byte(v); }
+          id(last_tx).publish_state(s);
+          id(last_ack_ms) = millis();
+
+  - platform: template
+    name: "Burnt Toast HOLD (stop)"
+    on_press:
+      - lambda: |-
+          id(burnt_hold) = false;
+
+  # Full re-handshake on demand
+  - platform: template
+    name: "Re-Handshake (36/38/46 gated)"
+    on_press:
+      - script.execute: rehandshake
