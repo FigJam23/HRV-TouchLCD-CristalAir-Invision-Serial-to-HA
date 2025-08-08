@@ -95,7 +95,7 @@ Frame A (7E 31 01 …)
 
 
 
-#keypad no controller conected. sniffs#
+#keypad no controller conected bench test conected directly to d1 mini . sniffs#
 Time	level	Tag	Message
 12:07:12	[D]	[text_sensor:069]	
 'HRV Raw Frame': Sending state '7E 31 01 75 00 1E 84 70 47 7E'
@@ -177,7 +177,7 @@ Time	level	Tag	Message
 'HRV WiFi Signal': Sending state -57.00000 dBm with 0 decimals of accuracy
 
 
-#key pad and controller first boot run Controller response:7E 30 01 24 00 AB 7E#
+#key pad and controller first boot run Controller  response:7E 30 01 24 00 AB 7E#
 
 Time	level	Tag	Message
 12:28:24	[D]	[text_sensor:069]	
