@@ -2,7 +2,6 @@ esphome:
   name: hrv
   friendly_name: HRV
 
-  # Start at 10% after components are up
   on_boot:
     priority: -10
     then:
@@ -10,8 +9,10 @@ esphome:
       - lambda: |-
           id(target_percent) = 10;
           id(last_nonzero_percent) = 10;
-          id(fan_percent).publish_state(10);  // sync the slider
-          id(send_fan).execute();             // send immediately
+          id(fan_percent).publish_state(10);
+          id(send_fan).execute();
+          id(last_rx_ms) = millis();
+      - script.execute: boot_handshake
 
 esp8266:
   board: d1_mini
@@ -62,11 +63,11 @@ mqtt:
         id(last_roof_temp ) = 255;
         id(last_setpoint  ) = 255;
         id(last_fan_speed ) = 255;
+
   on_disconnect:
     - lambda: |-
         ESP_LOGD("MQTT","Disconnected");
 
-  # retain-based filter state pickup
   on_message:
     - topic: "hassio/hrv/filter_days_remaining/state"
       qos: 1
@@ -97,6 +98,14 @@ uart:
   data_bits: 8
   parity: NONE
   stop_bits: 1
+
+text_sensor:
+  - platform: template
+    name: "Last TX Frame"
+    id: last_tx
+  - platform: template
+    name: "Last RX Frame"
+    id: last_rx
 
 # ───────── Globals ─────────
 globals:
@@ -132,19 +141,30 @@ globals:
     restore_value: yes
     initial_value: "730"  # full filter life
 
-  # Fan control state
+  # Fan control + TX spacing
   - id: target_percent
     type: int
     initial_value: '0'
   - id: last_nonzero_percent
     type: int
-    initial_value: '10'        # used for power-on restore
+    initial_value: '10'
   - id: last_sent_ms
     type: uint32_t
     initial_value: '0'
   - id: keepalive_period_ms
     type: int
     initial_value: '900'       # ~0.9s
+  - id: last_tx_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: last_rx_ms
+    type: uint32_t
+    initial_value: '0'
+
+  # We flip this true the first time we see a 0x31 frame
+  - id: got_telemetry_31
+    type: bool
+    initial_value: 'false'
 
 # ───────── Sensors ─────────
 sensor:
@@ -218,7 +238,6 @@ number:
           qos: 1
           retain: true
 
-  # Fan percentage slider
   - platform: template
     id: fan_percent
     name: "Fan %"
@@ -232,32 +251,6 @@ number:
           if (id(target_percent) > 0) id(last_nonzero_percent) = id(target_percent);
           id(send_fan).execute();
 
-button:
-  - platform: template
-    name: "Filter Reset"
-    icon: "mdi:restart"
-    on_press:
-      - lambda: |-
-          id(hrv_days_remaining) = 730;
-          id(hrv_filter_days_remaining).publish_state(730);
-          id(hrv_filter_life).publish_state(100);
-      - mqtt.publish:
-          topic: "hassio/hrv/filter_days_remaining/state"
-          payload: "730"
-          qos: 1
-          retain: true
-      - mqtt.publish:
-          topic: "hassio/hrv/filter_life/state"
-          payload: "100"
-          qos: 1
-          retain: true
-      - mqtt.publish:
-          topic: "hassio/hrv/filter_replacement_needed"
-          payload: "OFF"
-          qos: 1
-          retain: true
-
-# Power switch: OFF=0%, ON=last_nonzero (fallback 10%)
 switch:
   - platform: template
     name: "Power"
@@ -290,34 +283,76 @@ binary_sensor:
     id: hrv_keypad_on
     device_class: power
     lambda: |-
-      // On if we’re commanding >0 or we see >0 from telemetry
       return (id(target_percent) > 0) || (id(hrv_fan_speed).state > 0);
 
 # ───────── Scripts ─────────
 script:
-  # UART parser for temps/fan/setpoint
+  # --- raw helpers to send short bodies ---
+  - id: send2
+    parameters: { b1: int, b2: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  - id: send4
+    parameters: { b1: int, b2: int, b3: int, b4: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2,(uint8_t)b3,(uint8_t)b4};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  - id: send6
+    parameters: { b1: int, b2: int, b3: int, b4: int, b5: int, b6: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2,(uint8_t)b3,(uint8_t)b4,(uint8_t)b5,(uint8_t)b6};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  # UART parser
   - id: hrv_process_uart
     then:
       - lambda: |-
           static std::vector<uint8_t> frame;
           while (id(hrv_uart).available()) {
             uint8_t b; id(hrv_uart).read_byte(&b);
-            if (frame.empty()) {
-              if (b == 0x7E) frame.push_back(b);
-              continue;
-            }
+            if (frame.empty()) { if (b == 0x7E) frame.push_back(b); continue; }
             frame.push_back(b);
-            if (b == 0x7E && frame.size() >= 7) {
+
+            if (b == 0x7E && frame.size() >= 7) {   // end of frame
               size_t cks = frame.size() - 2;
-              int sum = 0;
-              for (size_t i = 1; i < cks; ++i) sum -= frame[i];
-              if ((uint8_t)(sum & 0xFF) == frame[cks]) {
+              int sum = 0; for (size_t i = 1; i < cks; ++i) sum -= frame[i];
+              bool ok = ((uint8_t)(sum & 0xFF) == frame[cks]);
+              if (ok) {
+                // mirror RX for visibility
+                std::string s; char tmp[4]; for (auto v: frame){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_rx).publish_state(s);
+
+                id(last_rx_ms) = millis();
                 uint8_t t = frame[1];
                 if (t == 0x31 && frame.size() == 10) {
+                  id(got_telemetry_31) = true;            // <-- key flag
                   uint16_t raw = (frame[2] << 8) | frame[3];
-                  float tmp = raw * 0.0625f;
-                  if (tmp >= 0 && tmp <= 45) {
-                    id(last_house_temp) = round(tmp*10)/10.0f;
+                  float tmpc = raw * 0.0625f;
+                  if (tmpc >= 0 && tmpc <= 45) {
+                    id(last_house_temp) = round(tmpc*10)/10.0f;
                     id(ts_house) = millis();
                     id(hrv_house_temp).publish_state(id(last_house_temp));
                   }
@@ -335,9 +370,9 @@ script:
                   }
                 } else if (t == 0x30 && frame.size() == 7) {
                   uint16_t raw = (frame[2] << 8) | frame[3];
-                  float tmp = raw * 0.0625f;
-                  if (tmp >= 0 && tmp <= 45) {
-                    id(last_roof_temp) = round(tmp*10)/10.0f;
+                  float tmpc = raw * 0.0625f;
+                  if (tmpc >= 0 && tmpc <= 45) {
+                    id(last_roof_temp) = round(tmpc*10)/10.0f;
                     id(ts_roof) = millis();
                     id(hrv_roof_temp).publish_state(id(last_roof_temp));
                   }
@@ -348,6 +383,59 @@ script:
             if (frame.size() > 24) frame.clear();
           }
 
+  # Send fan command (keepalive)
+  - id: send_fan
+    mode: queued
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+          uint32_t gap = (now - id(last_tx_ms));
+          if (gap < 140) { delay(140 - gap); yield(); }
+
+          int p = id(target_percent);
+          if (p < 0) p = 0; if (p > 100) p = 100;
+
+          uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
+
+          std::vector<uint8_t> body{0x31,0x01,code,(uint8_t)p,0x1E,0x84,0xF0};
+          std::vector<uint8_t> f{0x7E};
+          f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_sent_ms) = millis();
+          id(last_tx_ms)   = id(last_sent_ms);
+
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  # Boot + re-announce handshake
+  - id: boot_handshake
+    mode: queued
+    then:
+      # wake
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 250ms
+
+      # *** keypad announce from your capture ***
+      - script.execute: {id: send6, b1: 0x37, b2: 0x01, b3: 0x6A, b4: 0x00, b5: 0x1E, b6: 0x84}
+      - delay: 180ms
+
+      # short polls to kick the stream
+      - script.execute: {id: send2, b1: 0x34, b2: 0xE3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x33, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x43, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x35, b2: 0x83}
+
   - id: zero_stale_check
     then:
       - lambda: |-
@@ -357,54 +445,19 @@ script:
           if (now - id(ts_fan)      > to) id(hrv_fan_speed).publish_state(0);
           if (now - id(ts_setpoint) > to) id(hrv_setpoint).publish_state(0);
 
-  # Fan frame sender
-  - id: send_fan
-    mode: queued
-    then:
-      - lambda: |-
-          int p = id(target_percent);
-          if (p < 0) p = 0;
-          if (p > 100) p = 100;
-
-          // 0x4E for ≤30, 0x4F for 31..75, 0x50 for ≥76
-          uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
-
-          std::vector<uint8_t> body{0x31, 0x01, code, (uint8_t)p, 0x1E, 0x84, 0xF0};
-          std::vector<uint8_t> frame{0x7E};
-          frame.insert(frame.end(), body.begin(), body.end());
-          int sum = 0;
-          for (size_t i = 1; i < frame.size(); ++i) sum -= frame[i];
-          frame.push_back((uint8_t)sum);
-          frame.push_back(0x7E);
-
-          auto u = id(hrv_uart);
-          for (auto v : frame) u->write_byte(v);
-          id(last_sent_ms) = millis();
-
-  # NEW: poll controller for telemetry so Fan Speed updates
-  - id: poll_status
-    mode: queued
-    then:
-      - lambda: |-
-          std::vector<uint8_t> body{0x31,0x01,0x72,0x00,0x1E,0x84,0x70,0x4A};
-          std::vector<uint8_t> f{0x7E};
-          f.insert(f.end(), body.begin(), body.end());
-          int sum = 0; for (size_t i = 1; i < f.size(); ++i) sum -= f[i];
-          f.push_back((uint8_t)sum); f.push_back(0x7E);
-          auto u = id(hrv_uart);
-          for (auto v : f) u->write_byte(v);
-
 # ───────── Intervals ─────────
 interval:
+  # parser
   - interval: 80ms
     then:
       - script.execute: hrv_process_uart
 
+  # telemetry staleness
   - interval: 5s
     then:
       - script.execute: zero_stale_check
 
-  # Keepalive for fan command (always on)
+  # keepalive fan command
   - interval: 1s
     then:
       - lambda: |-
@@ -412,11 +465,37 @@ interval:
             id(send_fan).execute();
           }
 
-  # Poll the controller for telemetry
-  - interval: 2s
+  # if we haven't seen a 0x31 frame yet, keep re-announcing every 1.5s
+  - interval: 1.5s
     then:
-      - script.execute: poll_status
+      - lambda: |-
+          if (!id(got_telemetry_31)) {
+            ESP_LOGW("HRV","No 0x31 telemetry yet — re-announcing keypad");
+            id(boot_handshake).execute();
+          }
 
+  # gentle status poller (helps nudge responses)
+  - interval: 2.5s
+    then:
+      - script.execute: {id: send2, b1: 0x34, b2: 0xE3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x33, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x43, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x35, b2: 0x83}
+
+  # RX watchdog: if no valid frame seen in >3s, try handshake again
+  - interval: 3s
+    then:
+      - lambda: |-
+          if (millis() - id(last_rx_ms) > 3000) {
+            ESP_LOGW("HRV","No UART frames >3s; re-handshake");
+            id(last_rx_ms) = millis();
+            id(boot_handshake).execute();
+          }
+
+  # filter-day tick
   - interval: 24h
     then:
       - lambda: |-
