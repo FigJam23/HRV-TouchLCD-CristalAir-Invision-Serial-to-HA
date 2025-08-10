@@ -54,7 +54,7 @@ mqtt:
   id: hrv_mqtt
   broker: 192.168.1.44
   username: mqtt
-  password: Justj33p
+  password: Just
   client_id: hrv
   discovery: true
   discovery_unique_id_generator: mac
