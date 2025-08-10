@@ -17,7 +17,7 @@ wifi:
   reboot_timeout: 5min
   ap:
     ssid: "Hrv Fallback Hotspot"
-    password: "Justj33p"
+    password: "Just"
 
 logger:
   baud_rate: 115200
