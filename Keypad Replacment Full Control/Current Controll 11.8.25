@@ -23,7 +23,7 @@ esp8266:
 
 wifi:
   ssid: "Reaver"
-  password: "FigjamDilligaf74"
+  password: "Figjam"
   manual_ip:
     static_ip: 192.168.1.100
     gateway: 192.168.1.1
@@ -33,7 +33,7 @@ wifi:
   reboot_timeout: 5min
   ap:
     ssid: "Hrv Fallback Hotspot"
-    password: "Justj33p"
+    password: "Just"
 
 logger:
   baud_rate: 115200
@@ -54,7 +54,7 @@ mqtt:
   id: hrv_mqtt
   broker: 192.168.1.44
   username: mqtt
-  password: Justj33p
+  password: Just
   client_id: hrv
   discovery: true
   discovery_unique_id_generator: mac
