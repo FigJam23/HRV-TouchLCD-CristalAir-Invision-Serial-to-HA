@@ -38,7 +38,7 @@ mqtt:
   id: hrv_mqtt
   broker: 192.168.1.44
   username: mqtt
-  password: Justj33p
+  password: Just
   discovery: true
   topic_prefix: "hassio/hrv"
   keepalive: 60s
