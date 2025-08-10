@@ -391,7 +391,7 @@ binary_sensor:
   # NEW: Burnt Toast state (non-retained)
   - platform: template
     id: hrv_boost_active
-    name: "HRV Boost Active"
+    name: "Boost Active"
     device_class: running
     lambda: |-
       return id(boost_active);
