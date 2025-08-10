@@ -1,7 +1,8 @@
 
 
 
-```- id: hrv_winter_control_no_sonoff
+```
+- id: hrv_winter_control_no_sonoff
   alias: HRV Winter Control (No Sonoff)
   mode: restart
 
