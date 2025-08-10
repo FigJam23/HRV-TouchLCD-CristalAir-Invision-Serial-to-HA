@@ -1,110 +1,90 @@
-# HRV → Home Assistant
+HRV → Home Assistant
 
-A simple ESP8266/D1 Mini sketch that reads TTL-serial data from your HRV control panel and publishes it to Home Assistant via MQTT. Pulls house & roof temperatures, fan speed and control-panel setpoint; plans for sending control commands in a future update.
+An ESP8266/D1 Mini ESPHome configuration that fully emulates your HRV keypad and publishes all telemetry to Home Assistant via MQTT.
+No physical keypad is required — fan speed, setpoint, and filter life are controlled directly from HA.
+
+Includes state retention via MQTT, so fan speed, setpoint, and filter life restore after reboot.
 
 https://manuals.plus/hrv/3843-classic-controller-manual
+📦 Hardware
 
----
+    ESP8266 (Wemos D1 Mini shown; any 3.3 V ESP8266 will work)
 
-## 📦 Hardware
+    TTL logic-level shifter (5 V → 3.3 V)
 
-- ESP8266 (D1 Mini shown; any 3.3 V ESP8266 will work)  
-- TTL logic-level shifter (5 V → 3.3 V)   
-- 1 cap
-- Optional: buck converter if you switch to an external 5 V supply
+    1 × capacitor (for bus noise smoothing)
 
-<!-- Diagram Gallery: last image first -->
-<table align="center">
-  <tr>
-    <!-- Position 1: the previously “last” image -->
-    <td>
-      <img
-        src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30"
-        alt="Third Diagram"
-        width="200"
-      />
-    </td>
-    <!-- Position 2: Keypad Front -->
-    <td>
-      <img
-        src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
-        alt="Keypad Front"
-        width="200"
-      />
-    </td>
-    <!-- Position 3: Wiring Diagram 3 -->
-    <td>
-      <img
-        src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
-        alt="Wiring Diagram 3"
-        width="200"
-      />
-    </td>
-  </tr>
-</table>
+    Optional: buck converter if using an external 5 V supply
 
+    Optional: DHT22/AM2302 or similar sensor for external house temp
 
+<!-- Diagram Gallery: last image first --> <table align="center"> <tr> <td> <img src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30" alt="Third Diagram" width="200" /> </td> <td> <img src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b" alt="Keypad Front" width="200" /> </td> <td> <img src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973" alt="Wiring Diagram 3" width="200" /> </td> </tr> </table>
 
-
-
-
-
-
-
-
-
-
-
-```
 Components
 
 ESP8266 (Wemos D1 Mini)
-
-HRV Keypad
-
+HRV Keypad bus (removed when emulating)
 Logic Level Shifter (TX/RX)
 
 Wiring Connections
 
-5V → Positive (5V) [Blue]
-
+5V  → Positive (5V) [Blue]
 GND → Negative (GND) [Black]
-
-RX → LV1 ↔ HV1 → TX [Green]
-
-TX → LV2 ↔ HV2 → RX [White]
+RX  → LV1 ↔ HV1 → TX [Green]
+TX  → LV2 ↔ HV2 → RX [White]
 
 Notes
 
-Use logic level shifter for safe 3.3V-5V communication.
+Use logic level shifter for safe 3.3 V ↔ 5 V communication.
+Verify RX/TX orientation before powering up.
 
-Verify RX/TX correctly connected.
-```
----
+🚀 Features
 
-## 🚀 Features
+    Telemetry
 
-- **Telemetry**
-  **Multiple Controller Support**
-  - House temperature  
-  - Roof (remote) temperature
-  - Control-panel setpoint  
-  - Fan speed
-  - Purge-sensor temperature  
-  - Summer-1 (roof-fan) temperature  
-  - Summer-2 (roof-fan) temperature  
-  - ATU 1 damper position (%)  
-  - ATU 2 damper position (%)  
-  - Heat-transfer coil temperature  
-  - HX-preheat coil temperature  
+        Roof (remote) temperature from HRV controller
 
-- **Diagnostics & Raw Data**  
-  - Raw packet hex stream  
-  - Parsed flags (raw, decimal, binary, individual bits)
+        External house temperature (DHT22 or similar)
 
-  
+        Control-panel setpoint (0 = off / disabled)
 
-```
+        Fan speed (%)
+
+        Purge-sensor temperature
+
+        Summer-1 (roof-fan) temperature
+
+        Summer-2 (roof-fan) temperature
+
+        ATU 1 damper position (%)
+
+        ATU 2 damper position (%)
+
+        Heat-transfer coil temperature
+
+        HX-preheat coil temperature
+
+        Filter life % and days remaining
+
+    Control
+
+        Fan speed slider — retained via MQTT after reboot
+
+        Setpoint slider — retained via MQTT after reboot
+
+        Filter reset button — sets to 730 days (100%)
+
+        On/Off — quickly turn fan off or back to last speed
+
+    Diagnostics & Raw Data
+
+        Raw packet hex stream
+
+        Parsed flags (raw, decimal, binary, individual bits)
+
+        Ability to hide raw RX/TX frames and unused keypad status in ESPHome Web UI
+
+📡 Example Packet Data
 
 ── Roof temp (t=0x30, 7 bytes) ──
 7E      ← Start
@@ -120,8 +100,7 @@ Verify RX/TX correctly connected.
 0x31    ← t = 0x31 (house/keypad)
 0x01    ← sensor-ID = 1 (house)
 0x6D    ← raw temp high byte
-0x00    ← raw temp low  byte   (raw = 0x6D00 → 27904 × 0.0625 = 1744 °C*?)  
-           *only bytes 3–4 form temp; low nibble often zero 
+0x00    ← raw temp low  byte
 0x1E    ← fan speed = 0x1E (30 %)
 0x14    ← setpoint = 0x14 (20 °C)
 0x84    ← fixed payload
@@ -134,7 +113,7 @@ Verify RX/TX correctly connected.
 0x32    ← t = 0x32 (purge temp)
 0x00    ← sensor-ID = 0 (roof/purge)
 0xXX    ← raw temp high byte
-0xXX    ← raw temp low  byte   (× 0.0625 °C)
+0xXX    ← raw temp low  byte
 0xYY    ← checksum
 7E      
 
@@ -159,10 +138,10 @@ Verify RX/TX correctly connected.
 ── ATU 1 damper % (t=0x35, 7 bytes) ──
 7E    
 0x35    ← t = 0x35 (ATU 1)
-0x00    ← sensor-ID = 0
-0xXX    ← high byte (0x00 usually)
-0xXX    ← low byte  (→ % open)
-0xYY    ← checksum
+0x00
+0xXX
+0xXX
+0xYY
 7E      
 
 ── ATU 2 damper % (t=0x36, 7 bytes) ──
@@ -177,18 +156,17 @@ Verify RX/TX correctly connected.
 ── Heat-transfer coil temp (t=0x37, 7 bytes) ──
 7E    
 0x37    ← t = 0x37 (coil temp)
-0x01    ← sensor-ID = 1 (coil)
-0x6C    ← raw temp high byte
-0x00    ← raw temp low  byte   (raw = 0x6C00)
+0x01
+0x6C
+0x00
 0x??    ← checksum
 7E      
 
 ── HX-preheat coil temp (t=0x38, 7 bytes) ──
 7E    
 0x38    ← t = 0x38 (HX coil)
-0x00    ← sensor-ID = 0
-0x00    ← high byte
-0xC8    ← low byte (200 × 0.0625 = 12.5 °C)
+0x00
+0x00
+0xC8
 0x??    ← checksum
 7E
-```
