@@ -18,7 +18,46 @@ https://manuals.plus/hrv/3843-classic-controller-manual
 
     Optional: DHT22/AM2302 or similar sensor for external house temp
 
-<!-- Diagram Gallery: last image first --> <table align="center"> <tr> <td> <img src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30" alt="Third Diagram" width="200" /> </td> <td> <img src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b" alt="Keypad Front" width="200" /> </td> <td> <img src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973" alt="Wiring Diagram 3" width="200" /> </td> </tr> </table>
+<!-- Diagram Gallery: consistent 2×2 grid -->
+<table align="center" style="border-collapse: collapse;">
+  <tr>
+    <td align="center" style="padding: 10px;">
+      <img
+        src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30"
+        alt="Third Diagram"
+        width="260"
+      /><br/>
+      <sub>Third Diagram</sub>
+    </td>
+    <td align="center" style="padding: 10px;">
+      <img
+        src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
+        alt="Keypad Front"
+        width="260"
+      /><br/>
+      <sub>Keypad Front</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" style="padding: 10px;">
+      <img
+        src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
+        alt="Wiring Diagram 3"
+        width="260"
+      /><br/>
+      <sub>Wiring Diagram 3</sub>
+    </td>
+    <td align="center" style="padding: 10px;">
+      <img
+        src="https://github.com/user-attachments/assets/b8fe37f2-0166-437f-b924-54acbd8d6db7"
+        alt="Installed Example"
+        width="260"
+      /><br/>
+      <sub>Installed Example</sub>
+    </td>
+  </tr>
+</table>
+
 
 Components
 
