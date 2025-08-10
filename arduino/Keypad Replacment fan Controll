@@ -18,7 +18,7 @@
 
 // ---------- User config ----------
 const char* WIFI_SSID     = "Reaver";
-const char* WIFI_PASS     = "FigjamDilligaf74";
+const char* WIFI_PASS     = "Figjam";
 IPAddress    WIFI_IP(192,168,1,100);
 IPAddress    WIFI_GW(192,168,1,1);
 IPAddress    WIFI_MASK(255,255,255,0);
@@ -26,7 +26,7 @@ IPAddress    WIFI_MASK(255,255,255,0);
 const char* MQTT_HOST     = "192.168.1.44";
 const uint16_t MQTT_PORT  = 1883;
 const char* MQTT_USER     = "mqtt";
-const char* MQTT_PASS     = "Justj33p";
+const char* MQTT_PASS     = "Just";
 const char* MQTT_CLIENTID = "hrv";
 
 const char* TOPIC_PREFIX  = "hassio/hrv"; // keep as in ESPHome
