@@ -1,0 +1,17 @@
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 250ms
+      - script.execute: {id: send6, b1: 0x37, b2: 0x01, b3: 0x6A, b4: 0x00, b5: 0x1E, b6: 0x84}
+      - delay: 180ms
+      - script.execute: {id: send2, b1: 0x34, b2: 0xE3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x33, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x43, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x35, b2: 0x83}
