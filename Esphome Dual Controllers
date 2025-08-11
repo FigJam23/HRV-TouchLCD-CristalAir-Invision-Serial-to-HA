@@ -16,9 +16,8 @@ wifi:
   fast_connect: true
   reboot_timeout: 5min
   ap:
-    ssid: "Hrv Fallback Hotspot"
-    password: "Just"
-
+    ssid: "Hrv Figjam Hotspot"
+    password: "123456789"
 logger:
   baud_rate: 115200
   level: DEBUG
