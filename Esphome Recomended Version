@@ -1,3 +1,4 @@
+# State sensors only No fan Control#
 esphome:
   name: hrv
   friendly_name: HRV
