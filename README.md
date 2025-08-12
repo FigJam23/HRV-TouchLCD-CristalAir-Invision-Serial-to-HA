@@ -17,43 +17,44 @@ https://manuals.plus/hrv/3843-classic-controller-manual
     Optional: buck converter if using an external 5 V supply
 
     Optional: DHT22/AM2302 or similar sensor for external house temp
-
-<!-- Diagram Gallery: consistent 2×2 grid -->
+<!-- New Keypad Build ESP32 - Image Gallery -->
 <table align="center" style="border-collapse: collapse;">
   <tr>
     <td align="center" style="padding: 10px;">
-      <img
-        src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30"
-        alt="Third Diagram"
-        width="260"
-      /><br/>
-      <sub>Third Diagram</sub>
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/6e0b0809-e17d-45b1-8727-2efd2609b403.png" width="200"/><br/>
+      <sub>Keypad PCB</sub>
     </td>
     <td align="center" style="padding: 10px;">
-      <img
-        src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b"
-        alt="Keypad Front"
-        width="260"
-      /><br/>
-      <sub>Keypad Front</sub>
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/f7614291-c459-4cea-b07e-f4bfe5d946c0.png" width="200"/><br/>
+      <sub>Front View</sub>
+    </td>
+    <td align="center" style="padding: 10px;">
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/file_00000000bd6c622f9eaf868b7891e35b.png" width="200"/><br/>
+      <sub>Touch Test</sub>
     </td>
   </tr>
   <tr>
     <td align="center" style="padding: 10px;">
-      <img
-        src="https://github.com/user-attachments/assets/ac182a4e-5fb9-4af2-a0a2-11d3567e2973"
-        alt="Wiring Diagram 3"
-        width="260"
-      /><br/>
-      <sub>Wiring Diagram 3</sub>
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/file_0000000060ec61fd84d62c2a60668eef.png" width="200"/><br/>
+      <sub>Screen Layout 1</sub>
     </td>
     <td align="center" style="padding: 10px;">
-      <img
-        src="https://github.com/user-attachments/assets/b8fe37f2-0166-437f-b924-54acbd8d6db7"
-        alt="Installed Example"
-        width="260"
-      /><br/>
-      <sub>Installed Example</sub>
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/file_0000000086a461f8abbdfd0f251aac8b.png" width="200"/><br/>
+      <sub>Screen Layout 2</sub>
+    </td>
+    <td align="center" style="padding: 10px;">
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/New%20Keypad%20Build%20ESP32/file_00000000ba5061f8b88bcc3f6a8952d6.png" width="200"/><br/>
+      <sub>PCB Back</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" style="padding: 10px;">
+      <img src="https://github.com/user-attachments/assets/2139913b-beab-4f28-94c3-9a203223ec30" width="200"/><br/>
+      <sub>Third Diagram</sub>
+    </td>
+    <td align="center" style="padding: 10px;">
+      <img src="https://github.com/user-attachments/assets/98608253-7fee-40a3-9767-c512c4dd577b" width="200"/><br/>
+      <sub>Keypad Front</sub>
     </td>
   </tr>
 </table>
