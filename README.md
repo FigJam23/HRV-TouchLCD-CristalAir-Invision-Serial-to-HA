@@ -67,8 +67,11 @@ Logic Level Shifter (D1/D2 or TX/RX)
 Wiring Connections
 
 5V  → Positive (5V) [Blue]
+
 GND → Negative (GND) [Black]
+
 RX  → LV1 ↔ HV1 → TX/RX [Green]
+
 TX  → LV2 ↔ HV2 → RX/RX [White]
 
 Notes
