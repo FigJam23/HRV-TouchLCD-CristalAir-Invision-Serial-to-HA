@@ -64,19 +64,18 @@ Components
 
 ESP8266 (Wemos D1 Mini)
 HRV Keypad bus (removed when emulating)
-Logic Level Shifter (TX/RX)
+Logic Level Shifter (D1/D2 or TX/RX)
 
 Wiring Connections
 
 5V  → Positive (5V) [Blue]
 GND → Negative (GND) [Black]
-RX  → LV1 ↔ HV1 → TX [Green]
-TX  → LV2 ↔ HV2 → RX [White]
+RX  → LV1 ↔ HV1 → TX/RX [Green]
+TX  → LV2 ↔ HV2 → RX/RX [White]
 
 Notes
 
 Use logic level shifter for safe 3.3 V ↔ 5 V communication.
-Verify RX/TX orientation before powering up.
 
 🚀 Features
 
