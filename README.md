@@ -12,9 +12,7 @@ https://manuals.plus/hrv/3843-classic-controller-manual
 
     TTL logic-level shifter (5 V → 3.3 V)
 
-    1 × capacitor (for bus noise smoothing)
-
-    Optional: buck converter if using an external 5 V supply
+    1 × capacitor (for bus noise )
 
     Optional: DHT22/AM2302 or similar sensor for external house temp
 <!-- New Keypad Build ESP32 - Image Gallery -->
