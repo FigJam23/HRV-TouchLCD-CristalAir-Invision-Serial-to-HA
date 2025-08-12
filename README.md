@@ -5,6 +5,9 @@ No physical keypad is required — fan speed, setpoint, and filter life are cont
 
 Includes state retention via MQTT, so fan speed, setpoint, and filter life restore after reboot.
 
+This project will be moving to a ESP32 device due to limitations of memory of the esp8266 chipset, with touch screen and custome U.I's Theams etc. 
+
+
 https://manuals.plus/hrv/3843-classic-controller-manual
 📦 Hardware
 
