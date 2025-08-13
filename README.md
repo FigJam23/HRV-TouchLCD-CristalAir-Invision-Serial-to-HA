@@ -1,3 +1,6 @@
+https://youtube.com/shorts/8ISQGKKpurk?si=fGekwMP1LDX2R__V
+
+
 HRV → Home Assistant
 
 An ESP8266/D1 Mini ESPHome configuration that fully emulates your HRV keypad and publishes all telemetry to Home Assistant via MQTT.
