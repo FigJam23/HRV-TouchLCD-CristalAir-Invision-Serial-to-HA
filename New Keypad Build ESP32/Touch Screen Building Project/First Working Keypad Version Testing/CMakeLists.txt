@@ -1,0 +1,13 @@
+SET(SOURCES ui_comp_power.c
+    ui_comp.c
+    ui_Screen_1.c
+    ui_Screen_2.c
+    ui.c
+    ui_comp_hook.c
+    ui_helpers.c
+    ui_img_white_blank_png.c
+    ui_img_setpoint_up_png.c
+    ui_img_setpoint_down_png.c
+    ui_img_1471738535.c)
+
+add_library(ui ${SOURCES})
