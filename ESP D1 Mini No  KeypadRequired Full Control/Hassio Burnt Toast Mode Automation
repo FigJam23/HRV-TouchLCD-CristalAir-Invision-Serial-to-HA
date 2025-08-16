@@ -1,0 +1,244 @@
+
+
+
+```
+- id: hrv_winter_control_no_sonoff
+  alias: HRV Winter Control (No Sonoff)
+  mode: restart
+
+  # Re-evaluate on sensor changes + every 5 minutes
+  trigger:
+    - platform: state
+      entity_id:
+        - sensor.floating_unit_roof_living_temperature   # Roof temp (old sensor)
+        - sensor.floating_unit_roof_living_humidity      # Roof humidity (old sensor)
+        - sensor.upstairs_bedrooms_temperature           # House temp (old sensor)
+        - sensor.upstairs_bedrooms_humidity              # House humidity (old sensor)
+    - platform: time_pattern
+      minutes: "/5"
+
+  # 🔒 Do nothing while Burnt Toast/Boost is active
+  condition:
+    - condition: state
+      entity_id: binary_sensor.hrv_boost_active
+      state: 'off'
+
+  variables:
+    # ---- CONTROL ENTITIES (new ESPHome) ----
+    fan_power: switch.hrv_power
+    fan_speed_number: number.hrv_fan     # change if your entity is different
+
+    # ---- SENSOR ENTITIES (keep your existing ones) ----
+    roof_t_entity: sensor.floating_unit_roof_living_temperature
+    roof_h_entity: sensor.floating_unit_roof_living_humidity
+    house_t_entity: sensor.upstairs_bedrooms_temperature
+    house_h_entity: sensor.upstairs_bedrooms_humidity
+
+    # ---- Readings with safe fallbacks ----
+    roof_t: "{{ states(roof_t_entity)  | float(10.0) }}"
+    roof_h: "{{ states(roof_h_entity)  | float(55.0) }}"
+    house_t: "{{ states(house_t_entity) | float(10.0) }}"
+    house_h: "{{ states(house_h_entity) | float(55.0) }}"
+    dt: "{{ roof_t - house_t }}"                # temp delta (roof - house)
+    dh: "{{ roof_h - house_h }}"                # humidity delta (roof - house)
+
+    # ---- Schedules ----
+    day_start: "09:00:00"
+    eve_start: "16:00:00"
+    night_start: "22:00:00"
+    is_day: >-
+      {{ day_start <= now().strftime('%H:%M:%S') < eve_start }}
+    is_eve: >-
+      {{ eve_start <= now().strftime('%H:%M:%S') < night_start }}
+    is_night: >-
+      {{ now().strftime('%H:%M:%S') >= night_start or now().strftime('%H:%M:%S') < day_start }}
+
+    # ---- Tunables ----
+    heat_dt_on: 0.5        # start heating if roof ≥ house + 0.5°C
+    heat_dt_max: 4.0       # scale up to this delta
+    heat_hum_allow: 3.0    # roof humidity can be up to +3% higher and still heat
+
+    hum_hi: 65.0           # house humidity “high” above this
+    hum_adv: -2.0          # roof must be at least 2% DRIER (dh <= -2.0)
+    hum_cool_penalty: 0.5  # allow dehumidifying if roof ≤ 0.5°C cooler
+
+    min_circ: 10           # daytime trickle (%)
+    hum_speed: 18          # dehumidify speed
+    heat_min: 20           # min speed while heating
+    heat_max: 60           # max speed while heating
+
+  action:
+    - choose:
+
+        # 1) EVENING HEATING
+        - conditions:
+            - condition: template
+              value_template: "{{ is_eve }}"
+            - condition: template
+              value_template: "{{ dt >= heat_dt_on }}"
+            - condition: template
+              value_template: "{{ dh <= heat_hum_allow }}"
+          sequence:
+            - variables:
+                frac: >-
+                  {% set f = (dt - heat_dt_on) / (heat_dt_max - heat_dt_on) %}
+                  {{ [0, [f, 1] | min] | max }}
+                speed: "{{ (heat_min + frac * (heat_max - heat_min)) | round(0) }}"
+            - service: switch.turn_on
+              target: { entity_id: "{{ fan_power }}" }
+            - service: number.set_value
+              target: { entity_id: "{{ fan_speed_number }}" }
+              data: { value: "{{ speed }}" }
+
+        # 2) DAY HEATING
+        - conditions:
+            - condition: template
+              value_template: "{{ is_day }}"
+            - condition: template
+              value_template: "{{ dt >= heat_dt_on }}"
+            - condition: template
+              value_template: "{{ dh <= heat_hum_allow }}"
+          sequence:
+            - variables:
+                frac: >-
+                  {% set f = (dt - heat_dt_on) / (heat_dt_max - heat_dt_on) %}
+                  {{ [0, [f, 1] | min] | max }}
+                speed: "{{ (heat_min + frac * (heat_max - heat_min)) | round(0) }}"
+            - service: switch.turn_on
+              target: { entity_id: "{{ fan_power }}" }
+            - service: number.set_value
+              target: { entity_id: "{{ fan_speed_number }}" }
+              data: { value: "{{ speed }}" }
+
+        # 3) DEHUMIDIFY
+        - conditions:
+            - condition: template
+              value_template: "{{ house_h >= hum_hi }}"
+            - condition: template
+              value_template: "{{ dh <= hum_adv }}"
+            - condition: template
+              value_template: "{{ roof_t + hum_cool_penalty >= house_t }}"
+          sequence:
+            - service: switch.turn_on
+              target: { entity_id: "{{ fan_power }}" }
+            - service: number.set_value
+              target: { entity_id: "{{ fan_speed_number }}" }
+              data: { value: "{{ hum_speed }}" }
+
+        # 4) DAYTIME TRICKLE
+        - conditions:
+            - condition: template
+              value_template: "{{ is_day }}"
+          sequence:
+            - service: switch.turn_on
+              target: { entity_id: "{{ fan_power }}" }
+            - service: number.set_value
+              target: { entity_id: "{{ fan_speed_number }}" }
+              data: { value: "{{ min_circ }}" }
+
+        # 5) NIGHT/OFF
+        - conditions:
+            - condition: template
+              value_template: "{{ is_eve or is_night }}"
+          sequence:
+            - service: number.set_value
+              target: { entity_id: "{{ fan_speed_number }}" }
+              data: { value: 0 }
+            - service: switch.turn_off
+              target: { entity_id: "{{ fan_power }}" }
+```
+```
+When it runs
+
+    It re-evaluates whenever any of these change:
+    sensor.floating_unit_roof_living_temperature, sensor.floating_unit_roof_living_humidity, sensor.upstairs_bedrooms_temperature, sensor.upstairs_bedrooms_humidity.
+
+    It also re-checks every 5 minutes (time pattern).
+
+Hard stop (top-level condition)
+
+    If binary_sensor.hrv_boost_active is on (your Burnt Toast/Boost), the entire automation does nothing.
+    This prevents it from fighting your 5-minute 100% boost.
+
+What data it uses (variables)
+
+    Control outputs:
+
+        Power: switch.hrv_power
+
+        Speed %: number.hrv_fan
+
+    Sensors (unchanged, your existing ones):
+
+        Roof: sensor.floating_unit_roof_living_temperature / sensor.floating_unit_roof_living_humidity
+
+        House: sensor.upstairs_bedrooms_temperature / sensor.upstairs_bedrooms_humidity
+
+    It computes:
+
+        dt = roof_t - house_t (how much warmer/cooler the roof is vs house)
+
+        dh = roof_h - house_h (how much more/less humid the roof is vs house)
+
+Time windows
+
+    Day: 09:00–15:59
+
+    Evening: 16:00–21:59
+
+    Night: 22:00–08:59
+
+Choose logic (first match wins)
+
+    Evening heating (16:00–22:00)
+
+        Conditions: dt ≥ 0.5°C and roof humidity ≤ house humidity + 3%.
+
+        Action: turns HRV on and sets speed between 20–60% scaled by how big dt is (up to +4°C).
+
+    Day heating (09:00–16:00)
+
+        Same logic as evening heating: if roof is at least 0.5°C warmer and not too humid, fan on with scaled speed 20–60%.
+
+    Dehumidify (any time)
+
+        Conditions:
+
+            House humidity ≥ 65%,
+
+            Roof is at least 2% drier (dh ≤ -2%),
+
+            Roof is not more than 0.5°C cooler than house (roof_t + 0.5 ≥ house_t).
+
+        Action: HRV on at 18% (steady dehumidify speed).
+
+    Daytime trickle (09:00–16:00)
+
+        If none of the above matched, keep air moving: HRV on at 10%.
+
+    Night/off (16:00–09:00 unless caught by evening heating earlier)
+
+        Sets speed to 0% and turns HRV off.
+
+Priority notes
+
+    Because it’s a choose, only the first matching block runs each time.
+    So in the evening, heating takes precedence over night/off.
+    During the day, heating outranks dehumidify; if heating conditions aren’t met but dehumidify is, you’ll get the dehumidify block; if neither, you get the trickle.
+
+What you’ll see in HA
+
+    The automation will set:
+
+        switch.hrv_power on/off
+
+        number.hrv_fan to a percentage (0–100)
+
+Tuning tips (safe starting points)
+
+    If it’s not heating aggressively enough in the evening, reduce heat_dt_on to 0.3 or raise heat_max to 70.
+
+    If it’s too quick to run when the roof is a bit damp, drop heat_hum_allow from 3.0 to 2.0.
+
+    If dehumidify doesn’t kick in often enough, lower hum_hi to 62 or relax hum_adv to -1.5.
+```
