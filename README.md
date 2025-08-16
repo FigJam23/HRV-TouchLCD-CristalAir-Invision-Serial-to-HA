@@ -32,15 +32,6 @@ https://manuals.plus/hrv/3843-classic-controller-manual
 <table align="center" style="border-collapse: collapse;">
   <tr>
     <td align="center" style="padding: 10px;">
-      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Images/1.jpg" width="200"/><br/>
-      <sub>Keypad 1</sub>
-    </td>
-  <tr>
-    <td align="center" style="padding: 10px;">
-      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Images/2.jpg" width="200"/><br/>
-      <sub>Keypad 1</sub>
-    </td>
-    <td align="center" style="padding: 10px;">
       <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Images/4.jpg" width="200"/><br/>
       <sub>Keypad 1</sub>
     </td>
@@ -49,6 +40,11 @@ https://manuals.plus/hrv/3843-classic-controller-manual
       <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Images/5.jpg" width="200"/><br/>
       <sub>Keypad 1</sub>
     </td>
+    <td align="center" style="padding: 10px;">
+      <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Images/1.jpg" width="200"/><br/>
+      <sub>Keypad 1</sub>
+    </td>
+  <tr>
     <td align="center" style="padding: 10px;">
       <img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/Keypad%20Home%20Screens/6e0b0809-e17d-45b1-8727-2efd2609b403.png" width="200"/><br/>
       <sub>Keypad 1</sub>
