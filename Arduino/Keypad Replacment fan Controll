@@ -1,0 +1,465 @@
+/*
+  HRV Keypad Emulator — Arduino version of your ESPHome config
+  Board: D1 mini (ESP8266)
+  Pins:
+    UART half-duplex (TTL): TX=D1 (GPIO5), RX=D2 (GPIO4)
+    DHT22: D5 (GPIO14)
+    LED: GPIO2 (onboard) inverted
+*/
+
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <PubSubClient.h>
+#include <ArduinoOTA.h>
+#include <SoftwareSerial.h>   // EspSoftwareSerial
+#include <LittleFS.h>
+#include <ArduinoJson.h>
+#include <DHT.h>
+
+// ---------- User config ----------
+const char* WIFI_SSID     = "Reaver";
+const char* WIFI_PASS     = "Figjam";
+IPAddress    WIFI_IP(192,168,1,100);
+IPAddress    WIFI_GW(192,168,1,1);
+IPAddress    WIFI_MASK(255,255,255,0);
+
+const char* MQTT_HOST     = "192.168.1.44";
+const uint16_t MQTT_PORT  = 1883;
+const char* MQTT_USER     = "mqtt";
+const char* MQTT_PASS     = "Just";
+const char* MQTT_CLIENTID = "hrv";
+
+const char* TOPIC_PREFIX  = "hassio/hrv"; // keep as in ESPHome
+
+// OTA (optional) — set password if you want
+const char* OTA_PASSWORD  = "283355a588a90db0f31782330ad9f820";
+
+// DHT
+#define DHT_PIN   D5
+#define DHT_TYPE  DHT22
+
+// UART pins (half-duplex on TTL)
+#define UART_RX   D2
+#define UART_TX   D1
+const unsigned long UART_BAUD = 1200;
+
+// LED (inverted)
+#define LED_PIN   2
+// ---------------------------------
+
+// MQTT topics
+String t_filter_days_state   = String(TOPIC_PREFIX) + "/filter_days_remaining/state";
+String t_filter_life_state   = String(TOPIC_PREFIX) + "/filter_life/state";
+String t_filter_needed       = String(TOPIC_PREFIX) + "/filter_replacement_needed";
+String t_fan_percent_state   = String(TOPIC_PREFIX) + "/fan_percent/state";
+
+// State / globals
+volatile int   targetPercent = 0;
+int            lastNonzeroPercent = 10;
+float          lastHouseTemp = 255;
+float          lastRoofTemp  = 255;
+int            lastFanSpeed  = 255;
+uint32_t       tsHouse = 0, tsRoof = 0, tsFan = 0;
+
+int            hrvDaysRemaining = 730;
+
+uint32_t       sensorTimeoutMs = 15000;
+
+uint32_t       lastTxMs = 0;
+uint32_t       lastRxMs = 0;
+uint32_t       lastSentMs = 0;
+int            keepalivePeriodMs = 900;
+bool           gotTelemetry31 = false;
+
+// Timers
+uint32_t t80ms = 0;
+uint32_t t5s   = 0;
+uint32_t t1s   = 0;
+uint32_t t1500 = 0;
+uint32_t t2500 = 0;
+uint32_t t3s   = 0;
+uint32_t t24h  = 0;
+
+// Frame buffer for RX
+std::vector<uint8_t> rxFrame;
+
+// Peripherals
+DHT dht(DHT_PIN, DHT_TYPE);
+WiFiClient wifiClient;
+PubSubClient mqtt(wifiClient);
+SoftwareSerial bus(UART_RX, UART_TX, false, 256); // RX, TX, inverse=false, buf
+
+// ---------- Persistence ----------
+struct Persist {
+  int fanPercent;
+  int daysRemaining;
+};
+const char* PERSIST_PATH = "/hrv_state.json";
+
+void saveState() {
+  StaticJsonDocument<128> doc;
+  doc["fan"]  = targetPercent;
+  doc["days"] = hrvDaysRemaining;
+  File f = LittleFS.open(PERSIST_PATH, "w");
+  if (f) { serializeJson(doc, f); f.close(); }
+}
+
+void loadState() {
+  if (!LittleFS.exists(PERSIST_PATH)) return;
+  File f = LittleFS.open(PERSIST_PATH, "r");
+  if (!f) return;
+  StaticJsonDocument<128> doc;
+  DeserializationError e = deserializeJson(doc, f);
+  f.close();
+  if (!e) {
+    int p = doc["fan"] | 10;
+    int d = doc["days"] | 730;
+    if (p < 0) p = 0; if (p > 100) p = 10;
+    targetPercent = p;
+    lastNonzeroPercent = (p > 0) ? p : 10;
+    hrvDaysRemaining = d;
+  }
+}
+
+// ---------- Utils ----------
+void led(bool on) { digitalWrite(LED_PIN, on ? LOW : HIGH); } // inverted
+
+uint8_t checksumNegSum(const std::vector<uint8_t>& f) {
+  int sum = 0;
+  // sum of bytes AFTER 0x7E start byte and BEFORE checksum
+  for (size_t i = 1; i < f.size(); ++i) sum -= f[i];
+  return (uint8_t)(sum & 0xFF);
+}
+
+void hexDumpToTopic(const char* name, const std::vector<uint8_t>& f) {
+  // Publish a hex dump to a debug topic if you want (disabled by default).
+  // String topic = String(TOPIC_PREFIX) + "/" + name;
+  // String s;
+  // char tmp[4];
+  // for (auto v: f) { sprintf(tmp, "%02X ", v); s += tmp; }
+  // mqtt.publish(topic.c_str(), s.c_str());
+}
+
+// ---------- UART TX helpers ----------
+void sendFrame(const std::vector<uint8_t>& body) {
+  // obey tx spacing >= 140ms
+  uint32_t gap = millis() - lastTxMs;
+  if (gap < 140) delay(140 - gap);
+
+  std::vector<uint8_t> f; f.reserve(body.size() + 3);
+  f.push_back(0x7E);
+  f.insert(f.end(), body.begin(), body.end());
+  uint8_t cs = 0;
+  for (size_t i = 1; i < f.size(); ++i) cs -= f[i];
+  f.push_back(cs);
+  f.push_back(0x7E);
+
+  for (auto v : f) bus.write(v);
+  bus.flush();
+  lastTxMs = millis();
+  hexDumpToTopic("last_tx", f);
+}
+
+void send2(uint8_t b1, uint8_t b2) {
+  std::vector<uint8_t> body{ b1, b2 };
+  sendFrame(body);
+}
+
+void send4(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
+  std::vector<uint8_t> body{ b1, b2, b3, b4 };
+  sendFrame(body);
+}
+
+void send6(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, uint8_t b5, uint8_t b6) {
+  std::vector<uint8_t> body{ b1, b2, b3, b4, b5, b6 };
+  sendFrame(body);
+}
+
+// ---------- Protocol actions ----------
+void publishFilterLife() {
+  int lf = (int)round(hrvDaysRemaining * 100.0 / 730.0);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", lf);
+  mqtt.publish(t_filter_life_state.c_str(), buf, true);
+  mqtt.publish(t_filter_needed.c_str(), (hrvDaysRemaining <= 0) ? "ON" : "OFF", true);
+}
+
+void publishDaysRemaining() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", hrvDaysRemaining);
+  mqtt.publish(t_filter_days_state.c_str(), buf, true);
+  publishFilterLife();
+}
+
+void publishFanPercent(int p) {
+  char buf[8]; snprintf(buf, sizeof(buf), "%d", p);
+  mqtt.publish(t_fan_percent_state.c_str(), buf, true);
+}
+
+void sendFan() {
+  uint32_t now = millis();
+  uint32_t gap = (now - lastTxMs);
+  if (gap < 140) delay(140 - gap);
+
+  int p = targetPercent;
+  if (p < 0) p = 0; if (p > 100) p = 100;
+
+  // Code buckets like in ESPHome
+  uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
+
+  // Body for command (mirrors your YAML): 31 01 code p 1E 84 F0
+  std::vector<uint8_t> body{ 0x31, 0x01, code, (uint8_t)p, 0x1E, 0x84, 0xF0 };
+  sendFrame(body);
+
+  lastSentMs = millis();
+  tsFan = millis();
+  // Mirror UI instantly via MQTT retained (matches your ESPHome)
+  publishFanPercent(p);
+  saveState();
+}
+
+void bootHandshake() {
+  // Mirrors your sequence
+  send4(0x36,0x00,0x00,0x00); delay(200);
+  send4(0x36,0x00,0x00,0x00); delay(200);
+  send4(0x36,0x00,0x00,0x00); delay(200);
+  send4(0x36,0x00,0x00,0x00); delay(250);
+  send6(0x37,0x01,0x6A,0x00,0x1E,0x84); delay(180);
+  send2(0x34,0xE3); delay(120);
+  send2(0x33,0xC3); delay(120);
+  send2(0x43,0xC3); delay(120);
+  send2(0x35,0x83);
+}
+
+// ---------- UART RX parsing ----------
+void processUart() {
+  while (bus.available()) {
+    uint8_t b = (uint8_t)bus.read();
+    if (rxFrame.empty()) {
+      if (b == 0x7E) rxFrame.push_back(b);
+      continue;
+    }
+    rxFrame.push_back(b);
+
+    if (b == 0x7E && rxFrame.size() >= 7) {
+      size_t cks = rxFrame.size() - 2;
+      int sum = 0; for (size_t i = 1; i < cks; ++i) sum -= rxFrame[i];
+      bool ok = ((uint8_t)(sum & 0xFF) == rxFrame[cks]);
+      if (ok) {
+        lastRxMs = millis();
+        hexDumpToTopic("last_rx", rxFrame);
+
+        uint8_t t = rxFrame[1];
+        if (t == 0x31 && rxFrame.size() == 10) {
+          gotTelemetry31 = true;
+          uint16_t raw = (rxFrame[2] << 8) | rxFrame[3];
+          float tmpc = raw * 0.0625f;
+          if (tmpc >= 0 && tmpc <= 45) {
+            lastHouseTemp = round(tmpc * 10) / 10.0f;
+            tsHouse = millis();
+          }
+          int fan = rxFrame[4];
+          if (fan >= 0 && fan <= 100) {
+            lastFanSpeed = fan;
+            tsFan = millis();
+            // (Optional) publish to some topic if you want the live sensor
+            // mqtt.publish((String(TOPIC_PREFIX)+"/fan_speed").c_str(), String(fan).c_str());
+          }
+        } else if (t == 0x30 && rxFrame.size() == 7) {
+          uint16_t raw = (rxFrame[2] << 8) | rxFrame[3];
+          float tmpc = raw * 0.0625f;
+          if (tmpc >= 0 && tmpc <= 45) {
+            lastRoofTemp = round(tmpc * 10) / 10.0f;
+            tsRoof = millis();
+            // mqtt.publish((String(TOPIC_PREFIX)+"/roof_temp").c_str(), String(lastRoofTemp,1).c_str());
+          }
+        }
+      }
+      rxFrame.clear();
+    }
+    if (rxFrame.size() > 24) rxFrame.clear();
+  }
+}
+
+// ---------- MQTT handlers ----------
+void mqttCallback(char* topic, byte* payload, unsigned int len) {
+  String t(topic);
+  String msg; msg.reserve(len);
+  for (unsigned int i = 0; i < len; i++) msg += (char)payload[i];
+
+  if (t == t_filter_days_state) {
+    int d = msg.toInt();
+    hrvDaysRemaining = constrain(d, 0, 730);
+    publishDaysRemaining();
+    saveState();
+  } else if (t == t_filter_life_state) {
+    // allow setting % directly (mirrors ESPHome behavior)
+    int lf = msg.toInt(); (void)lf; // we compute from days; accept but no-op
+  } else if (t == t_fan_percent_state) {
+    int p = constrain(msg.toInt(), 0, 100);
+    targetPercent = p;
+    if (p > 0) lastNonzeroPercent = p;
+    publishFanPercent(p);  // mirror immediately
+    sendFan();
+  }
+}
+
+void ensureMqtt() {
+  if (mqtt.connected()) return;
+  while (!mqtt.connected()) {
+    led(true);
+    if (mqtt.connect(MQTT_CLIENTID, MQTT_USER, MQTT_PASS)) {
+      // Subscriptions (same retained topics ESPHome listens to)
+      mqtt.subscribe(t_filter_days_state.c_str(), 1);
+      mqtt.subscribe(t_filter_life_state.c_str(), 1);
+      mqtt.subscribe(t_fan_percent_state.c_str(), 1);
+
+      // On connect init (like ESPHome on_connect lambda)
+      lastHouseTemp = 255;
+      lastRoofTemp  = 255;
+      lastFanSpeed  = 255;
+
+      // Publish current retained states so HA/UI snaps into place
+      publishDaysRemaining();
+      publishFilterLife();
+      publishFanPercent(targetPercent);
+
+    } else {
+      delay(1000);
+    }
+    led(false);
+  }
+}
+
+// ---------- Setup / Loop ----------
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  led(false);
+
+  LittleFS.begin();
+  loadState();
+
+  // WiFi
+  WiFi.mode(WIFI_STA);
+  WiFi.config(WIFI_IP, WIFI_GW, WIFI_MASK);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) { led(true); delay(200); led(false); delay(300); }
+
+  // OTA
+  ArduinoOTA.setHostname("hrv");
+  if (strlen(OTA_PASSWORD)) ArduinoOTA.setPassword(OTA_PASSWORD);
+  ArduinoOTA.begin();
+
+  // MQTT
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt.setCallback(mqttCallback);
+
+  // UART
+  bus.begin(UART_BAUD, SWSERIAL_8N1);
+  // DHT
+  dht.begin();
+
+  // Initial restore/announce (maps to on_boot)
+  // We’ve already loaded targetPercent/days from FS; clamp and send.
+  if (targetPercent < 0 || targetPercent > 100) targetPercent = 10;
+  if (targetPercent > 0) lastNonzeroPercent = targetPercent; else lastNonzeroPercent = 10;
+
+  lastRxMs = millis();
+  bootHandshake();
+
+  // Kick an initial fan send and publish mirror
+  publishFanPercent(targetPercent);
+  sendFan();
+
+  t80ms = t5s = t1s = t1500 = t2500 = t3s = millis();
+  t24h  = millis();
+}
+
+void loop() {
+  ArduinoOTA.handle();
+  ensureMqtt();
+  mqtt.loop();
+
+  processUart();
+
+  // 80ms polling for UART processing (already continuous)
+  // 5s: zero stale check (except fan)
+  if (millis() - t5s >= 5000) {
+    t5s = millis();
+    if (millis() - tsHouse > sensorTimeoutMs) {
+      // mqtt.publish((String(TOPIC_PREFIX)+"/house_temp").c_str(), "0");
+    }
+    if (millis() - tsRoof > sensorTimeoutMs) {
+      // mqtt.publish((String(TOPIC_PREFIX)+"/roof_temp").c_str(), "0");
+    }
+  }
+
+  // 1s: keepalive send (resend fan cmd)
+  if (millis() - t1s >= 1000) {
+    t1s = millis();
+    if (millis() - lastSentMs > (uint32_t)keepalivePeriodMs) {
+      sendFan();
+    }
+  }
+
+  // 1.5s: if no 0x31 yet, re-announce keypad
+  if (millis() - t1500 >= 1500) {
+    t1500 = millis();
+    if (!gotTelemetry31) {
+      bootHandshake();
+    }
+  }
+
+  // 2.5s: periodic announce sequence
+  if (millis() - t2500 >= 2500) {
+    t2500 = millis();
+    send2(0x34,0xE3); delay(120);
+    send2(0x33,0xC3); delay(120);
+    send2(0x43,0xC3); delay(120);
+    send2(0x35,0x83);
+  }
+
+  // 3s: if RX silent, re-handshake
+  if (millis() - t3s >= 3000) {
+    t3s = millis();
+    if (millis() - lastRxMs > 3000) {
+      lastRxMs = millis();
+      bootHandshake();
+    }
+  }
+
+  // 24h: decrement filter days + publish (approx, resets on reboot)
+  if (millis() - t24h >= 24UL*60UL*60UL*1000UL) {
+    t24h = millis();
+    if (hrvDaysRemaining > 0) hrvDaysRemaining--;
+    publishDaysRemaining();
+    saveState();
+  }
+
+  // Local DHT update every ~30s (simple cadence)
+  static uint32_t tDht = 0;
+  if (millis() - tDht >= 30000) {
+    tDht = millis();
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (!isnan(t)) { lastHouseTemp = round(t*10)/10.0; tsHouse = millis(); }
+    (void)h; // available if you want to publish humidity via MQTT
+  }
+}
+
+// ---------- Public controls you might call from MQTT/REST ----------
+// Power ON
+void powerOn() {
+  int p = (lastNonzeroPercent > 0) ? lastNonzeroPercent : 10;
+  targetPercent = p;
+  publishFanPercent(p);
+  sendFan();
+}
+// Power OFF
+void powerOff() {
+  targetPercent = 0;
+  publishFanPercent(0);
+  sendFan();
+}
+
+// If you want to expose simple HTTP endpoints (optional), you can add ESP8266WebServer here.
