@@ -40,7 +40,7 @@ using fs::FS;
  *  WIFI + MQTT CONFIG
  ***********************/
 static const char* WIFI_SSID     = "Reaver";
-static const char* WIFI_PASSWORD = "FigjamDilligaf74";
+static const char* WIFI_PASSWORD = "Figjam";
 
 static const char* AP_SSID       = "HRV-Keypad";
 static const char* AP_PASS       = "12345678";  // 8+ chars required by ESP
@@ -49,7 +49,7 @@ static const char* AP_PASS       = "12345678";  // 8+ chars required by ESP
 static const char* MQTT_HOST     = "192.168.1.44";
 static const uint16_t MQTT_PORT  = 1883;
 static const char* MQTT_USER     = "mqtt";
-static const char* MQTT_PASS     = "Justj33p";
+static const char* MQTT_PASS     = "Just";
 static const char* MQTT_CLIENTID = "hrv";
 
 // Mutable (runtime/NVS) MQTT settings
