@@ -1,6 +1,9 @@
 https://youtube.com/shorts/8ISQGKKpurk?si=fGekwMP1LDX2R__V
 
 ```
+static const char* AP_SSID       = "HRV-Keypad";
+static const char* AP_PASS       = "12345678";  // 8+ chars required by ESP
+
 // MQTT topics
 static const char* T_FILTER_DAYS     = "hassio/hrv/filter_days_remaining/state";
 static const char* T_FILTER_LIFE     = "hassio/hrv/filter_life/state";
