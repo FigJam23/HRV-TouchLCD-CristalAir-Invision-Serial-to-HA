@@ -32,4 +32,15 @@ static const char* T_BOOST_TOTAL_S   = "hassio/hrv/boost_total_s/state";
   <tr>
     <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/Keypad%20Home%20Screens/file_00000000bd6c622f9eaf868b7891e35b.png" width="150"></td>
   </tr>
+    <tr>
+    <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/images/20250817_124352.jpg" width="150"></td>
+    <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/images/20250817_155330.jpg" width="150"></td>
+    <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/images/Screenshot%202025-08-17%20155137.png" width="150"></td>
+  </tr>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/images/Screenshot_20250816_200522_Photos.jpg" width="150"></td>
+    
+    <td><img src="https://raw.githubusercontent.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/main/Arduino%20Keypad%20Clone%20ESP32/images/dcf8f7d7d761e37fbe80fdd2cfe1de518e234cb3.png" width="150"></td>
+  </tr>
+
 </table>
