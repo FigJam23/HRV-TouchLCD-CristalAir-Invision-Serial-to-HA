@@ -1,5 +1,6 @@
 ##### Demo Keyoad Replacement ######
-<img width="1020" height="315" alt="image" src="https://github.com/user-attachments/assets/1a991572-72bf-46f4-b31b-fa93032da1d9" />
+<img width="1011" height="308" alt="image" src="https://github.com/user-attachments/assets/996acad2-d718-41d6-b9c1-dc72829293ce" />
+
 
 ```
 Latest Version
