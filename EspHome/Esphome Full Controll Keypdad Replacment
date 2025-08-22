@@ -1,0 +1,556 @@
+esphome:
+  name: hrv
+  friendly_name: HRV
+
+  on_boot:
+    priority: -10
+    then:
+      - delay: 500ms
+      - lambda: |-
+          // Restore from the number's persisted state first
+          int p = (int) id(fan_percent).state;   // restore_value: yes on the number below
+          if (p < 0 || p > 100) p = 10;          // default if unset
+          id(target_percent) = p;
+          id(last_nonzero_percent) = (p > 0) ? p : 10;
+          id(fan_percent).publish_state(p);
+          id(hrv_fan_speed).publish_state(p);  // keep sensor matching the slider immediately
+          id(send_fan).execute();
+          id(last_rx_ms) = millis();
+      - script.execute: boot_handshake
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: "Reaver"
+  password: "Figjam"
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  power_save_mode: none
+  fast_connect: true
+  reboot_timeout: 5min
+  ap:
+    ssid: "Hrv Figjam Hotspot"
+    password: "123456789"
+
+logger:
+  baud_rate: 115200
+  level: DEBUG
+
+api:
+  encryption:
+    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
+
+ota:
+  platform: esphome
+  password: "283355a588a90db0f31782330ad9f820"
+
+web_server:
+  port: 80
+
+mqtt:
+  id: hrv_mqtt
+  broker: 192.168.1.44
+  username: mqtt
+  password: Just
+  client_id: hrv
+  discovery: true
+  discovery_unique_id_generator: mac
+  topic_prefix: "hassio/hrv"
+  keepalive: 60s
+
+  on_connect:
+    - lambda: |-
+        id(last_house_temp) = 255;
+        id(last_roof_temp ) = 255;
+        id(last_fan_speed ) = 255;
+
+  on_disconnect:
+    - lambda: |-
+        ESP_LOGD("MQTT","Disconnected");
+
+  on_message:
+    - topic: "hassio/hrv/filter_days_remaining/state"
+      qos: 1
+      then:
+        - lambda: |-
+            int d = atoi(x.c_str());
+            id(hrv_days_remaining) = d;
+            id(hrv_filter_days_remaining).publish_state(d);
+            id(hrv_filter_life).publish_state(round(d * 100.0f / 730.0f));
+    - topic: "hassio/hrv/filter_life/state"
+      qos: 1
+      then:
+        - lambda: |-
+            int lf = atoi(x.c_str());
+            id(hrv_filter_life).publish_state(lf);
+    # Retained Fan % restore from MQTT
+    - topic: "hassio/hrv/fan_percent/state"
+      qos: 1
+      then:
+        - lambda: |-
+            int p = atoi(x.c_str());
+            if (p < 0) p = 0; if (p > 100) p = 100;
+            id(target_percent) = p;
+            if (p > 0) id(last_nonzero_percent) = p;
+            id(fan_percent).publish_state(p);
+            id(hrv_fan_speed).publish_state(p);  // mirror immediately
+            id(send_fan).execute();
+
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: led
+    inverted: true
+
+uart:
+  id: hrv_uart
+  rx_pin: D2
+  tx_pin: D1
+  baud_rate: 1200
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+
+text_sensor:
+  - platform: template
+    name: "Last TX Frame"
+    id: last_tx
+    internal: true
+    update_interval: never
+  - platform: template
+    name: "Last RX Frame"
+    id: last_rx
+    internal: true
+    update_interval: never
+
+globals:
+  - id: last_house_temp
+    type: float
+    initial_value: "255"
+  - id: ts_house
+    type: uint32_t
+    initial_value: "0"
+  - id: last_roof_temp
+    type: float
+    initial_value: "255"
+  - id: ts_roof
+    type: uint32_t
+    initial_value: "0"
+  - id: last_fan_speed
+    type: int
+    initial_value: "255"
+  - id: ts_fan
+    type: uint32_t
+    initial_value: "0"
+  - id: sensor_timeout_ms
+    type: uint32_t
+    initial_value: "15000"
+  - id: hrv_days_remaining
+    type: int
+    restore_value: yes
+    initial_value: "730"
+
+  # Fan control + TX spacing
+  - id: target_percent
+    type: int
+    initial_value: '0'
+  - id: last_nonzero_percent
+    type: int
+    initial_value: '10'
+  - id: last_sent_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: keepalive_period_ms
+    type: int
+    initial_value: '900'
+  - id: last_tx_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: last_rx_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: got_telemetry_31
+    type: bool
+    initial_value: 'false'
+
+sensor:
+  # Local temp/humidity (replaces keypad sensor) — DHT22 on D5
+  - platform: dht
+    pin: D5
+    model: DHT22
+    update_interval: 30s
+    temperature:
+      name: "House Temp"
+      id: hrv_house_temp
+      accuracy_decimals: 1
+      on_value:
+        - lambda: |-
+            if (!isnan(x)) { id(last_house_temp) = x; id(ts_house) = millis(); }
+    humidity:
+      name: "House Humidity"
+      id: house_humidity
+      unit_of_measurement: "%"
+      accuracy_decimals: 1
+
+  # From controller (parsed via UART)
+  - platform: template
+    name: "Roof Temp"
+    id: hrv_roof_temp
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "Fan Speed"
+    id: hrv_fan_speed
+    unit_of_measurement: "%"
+    icon: "mdi:fan"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Filter Life"
+    id: hrv_filter_life
+    unit_of_measurement: "%"
+    icon: "mdi:air-filter"
+    accuracy_decimals: 0
+    lambda: |-
+      return (int)round(id(hrv_days_remaining) * 100.0f / 730.0f);
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: hrv_wifi_signal
+    update_interval: 30s
+
+number:
+  - platform: template
+    name: "Filter Days Remaining"
+    id: hrv_filter_days_remaining
+    min_value: 0
+    max_value: 730
+    step: 1
+    optimistic: true
+    restore_value: yes
+    set_action:
+      - lambda: |-
+          id(hrv_days_remaining) = (int)x;
+          id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining) * 100.0 / 730.0));
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: !lambda 'return to_string(id(hrv_days_remaining));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining) * 100.0 / 730.0));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: !lambda 'return id(hrv_days_remaining) <= 0 ? "ON" : "OFF";'
+          qos: 1
+          retain: true
+
+  - platform: template
+    id: fan_percent
+    name: "Fan %"
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    restore_value: yes        # keep last slider value in flash
+    set_action:
+      - lambda: |-
+          int p = (int)x;
+          if (p < 0) p = 0; if (p > 100) p = 100;
+          id(target_percent) = p;
+          if (p > 0) id(last_nonzero_percent) = p;
+          id(hrv_fan_speed).publish_state(p);  // mirror to sensor so UI matches immediately
+          id(send_fan).execute();
+      - mqtt.publish:         # also keep it retained in MQTT
+          topic: "hassio/hrv/fan_percent/state"
+          payload: !lambda 'return to_string((int)id(target_percent));'
+          qos: 1
+          retain: true
+
+button:
+  - platform: template
+    name: "Filter Reset"
+    icon: "mdi:restart"
+    on_press:
+      - lambda: |-
+          id(hrv_days_remaining) = 730;
+          id(hrv_filter_days_remaining).publish_state(730);
+          id(hrv_filter_life).publish_state(100);
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: "730"
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: "100"
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: "OFF"
+          qos: 1
+          retain: true
+
+switch:
+  - platform: template
+    name: "Power"
+    id: hrv_power
+    icon: "mdi:power"
+    lambda: |-
+      return id(target_percent) > 0;
+    turn_on_action:
+      - lambda: |-
+          int p = id(last_nonzero_percent) > 0 ? id(last_nonzero_percent) : 10;
+          id(target_percent) = p;
+          id(fan_percent).publish_state(p);
+          id(hrv_fan_speed).publish_state(p);  // keep UI matched
+          id(send_fan).execute();
+      - mqtt.publish:
+          topic: "hassio/hrv/fan_percent/state"
+          payload: !lambda 'return to_string((int)id(target_percent));'
+          qos: 1
+          retain: true
+    turn_off_action:
+      - lambda: |-
+          id(target_percent) = 0;
+          id(fan_percent).publish_state(0);
+          id(hrv_fan_speed).publish_state(0);  // keep UI matched
+          id(send_fan).execute();
+      - mqtt.publish:
+          topic: "hassio/hrv/fan_percent/state"
+          payload: "0"
+          qos: 1
+          retain: true
+
+binary_sensor:
+  - platform: template
+    id: hrv_filter_replacement_needed
+    name: "Filter Replacement Needed"
+    device_class: problem
+    lambda: |-
+      return id(hrv_days_remaining) <= 0;
+
+  - platform: template
+    id: hrv_keypad_on
+    internal: true      # hidden from UI
+    lambda: |-
+      return (id(target_percent) > 0) || (id(hrv_fan_speed).state > 0);
+
+script:
+  - id: send2
+    parameters: { b1: int, b2: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  - id: send4
+    parameters: { b1: int, b2: int, b3: int, b4: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2,(uint8_t)b3,(uint8_t)b4};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  - id: send6
+    parameters: { b1: int, b2: int, b3: int, b4: int, b5: int, b6: int }
+    then:
+      - lambda: |-
+          uint32_t gap = millis() - id(last_tx_ms);
+          if (gap < 140) { delay(140 - gap); yield(); }
+          std::vector<uint8_t> f{0x7E,(uint8_t)b1,(uint8_t)b2,(uint8_t)b3,(uint8_t)b4,(uint8_t)b5,(uint8_t)b6};
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_tx_ms)=millis();
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+  - id: hrv_process_uart
+    then:
+      - lambda: |-
+          static std::vector<uint8_t> frame;
+          while (id(hrv_uart).available()) {
+            uint8_t b; id(hrv_uart).read_byte(&b);
+            if (frame.empty()) { if (b == 0x7E) frame.push_back(b); continue; }
+            frame.push_back(b);
+            if (b == 0x7E && frame.size() >= 7) {
+              size_t cks = frame.size() - 2;
+              int sum = 0; for (size_t i = 1; i < cks; ++i) sum -= frame[i];
+              bool ok = ((uint8_t)(sum & 0xFF) == frame[cks]);
+              if (ok) {
+                std::string s; char tmp[4]; for (auto v: frame){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_rx).publish_state(s);
+                id(last_rx_ms) = millis();
+                uint8_t t = frame[1];
+                if (t == 0x31 && frame.size() == 10) {
+                  id(got_telemetry_31) = true;
+                  uint16_t raw = (frame[2] << 8) | frame[3];
+                  float tmpc = raw * 0.0625f;
+                  if (tmpc >= 0 && tmpc <= 45) {
+                    id(last_house_temp) = round(tmpc * 10) / 10.0f;
+                    id(ts_house) = millis();
+                  }
+                  int fan = frame[4];
+                  if (fan >= 0 && fan <= 100) {
+                    id(last_fan_speed) = fan;
+                    id(ts_fan) = millis();
+                    id(hrv_fan_speed).publish_state(fan);
+                  }
+                } else if (t == 0x30 && frame.size() == 7) {
+                  uint16_t raw = (frame[2] << 8) | frame[3];
+                  float tmpc = raw * 0.0625f;
+                  if (tmpc >= 0 && tmpc <= 45) {
+                    id(last_roof_temp) = round(tmpc * 10) / 10.0f;
+                    id(ts_roof) = millis();
+                    id(hrv_roof_temp).publish_state(id(last_roof_temp));
+                  }
+                }
+              }
+              frame.clear();
+            }
+            if (frame.size() > 24) frame.clear();
+          }
+
+  - id: send_fan
+    mode: queued
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+          uint32_t gap = (now - id(last_tx_ms));
+          if (gap < 140) { delay(140 - gap); yield(); }
+
+          int p = id(target_percent);
+          if (p < 0) p = 0; if (p > 100) p = 100;
+
+          uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
+
+          std::vector<uint8_t> body{0x31,0x01,code,(uint8_t)p,0x1E,0x84,0xF0};
+          std::vector<uint8_t> f{0x7E};
+          f.insert(f.end(), body.begin(), body.end());
+          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+          f.push_back((uint8_t)sum); f.push_back(0x7E);
+
+          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+          id(last_sent_ms) = millis();
+          id(last_tx_ms)   = id(last_sent_ms);
+
+          id(hrv_fan_speed).publish_state(p);   // NEW: keep sensor matching slider
+          id(ts_fan) = millis();                // NEW: mark fan data as fresh
+
+          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+
+
+  - id: boot_handshake
+    mode: queued
+    then:
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 200ms
+      - script.execute: {id: send4, b1: 0x36, b2: 0x00, b3: 0x00, b4: 0x00}
+      - delay: 250ms
+      - script.execute: {id: send6, b1: 0x37, b2: 0x01, b3: 0x6A, b4: 0x00, b5: 0x1E, b6: 0x84}
+      - delay: 180ms
+      - script.execute: {id: send2, b1: 0x34, b2: 0xE3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x33, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x43, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x35, b2: 0x83}
+
+  - id: zero_stale_check
+    then:
+      - lambda: |-
+          uint32_t now = millis(), to = id(sensor_timeout_ms);
+          if (now - id(ts_house) > to) id(hrv_house_temp).publish_state(0);
+          if (now - id(ts_roof)  > to) id(hrv_roof_temp).publish_state(0);
+          // DO NOT zero fan speed here anymore:
+          // if (now - id(ts_fan)   > to) id(hrv_fan_speed).publish_state(0);
+
+
+interval:
+  - interval: 80ms
+    then:
+      - script.execute: hrv_process_uart
+
+  - interval: 5s
+    then:
+      - script.execute: zero_stale_check
+
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (millis() - id(last_sent_ms) > (uint32_t)id(keepalive_period_ms)) {
+            id(send_fan).execute();
+          }
+
+  - interval: 1.5s
+    then:
+      - lambda: |-
+          if (!id(got_telemetry_31)) {
+            ESP_LOGW("HRV","No 0x31 telemetry yet — re-announcing keypad");
+            id(boot_handshake).execute();
+          }
+
+  - interval: 2.5s
+    then:
+      - script.execute: {id: send2, b1: 0x34, b2: 0xE3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x33, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x43, b2: 0xC3}
+      - delay: 120ms
+      - script.execute: {id: send2, b1: 0x35, b2: 0x83}
+
+  - interval: 3s
+    then:
+      - lambda: |-
+          if (millis() - id(last_rx_ms) > 3000) {
+            ESP_LOGW("HRV","No UART frames >3s; re-handshake");
+            id(last_rx_ms) = millis();
+            id(boot_handshake).execute();
+          }
+
+  - interval: 24h
+    then:
+      - lambda: |-
+          if (id(hrv_days_remaining) > 0) id(hrv_days_remaining)--;
+          id(hrv_filter_days_remaining).publish_state(id(hrv_days_remaining));
+          id(hrv_filter_life).publish_state(round(id(hrv_days_remaining) * 100.0 / 730.0));
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_days_remaining/state"
+          payload: !lambda 'return to_string(id(hrv_days_remaining));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_life/state"
+          payload: !lambda 'return to_string(round(id(hrv_days_remaining) * 100.0 / 730.0));'
+          qos: 1
+          retain: true
+      - mqtt.publish:
+          topic: "hassio/hrv/filter_replacement_needed"
+          payload: !lambda 'return id(hrv_days_remaining) <= 0 ? "ON" : "OFF";'
+          qos: 1
+          retain: true
