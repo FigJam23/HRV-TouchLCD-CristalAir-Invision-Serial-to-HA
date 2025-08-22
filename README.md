@@ -141,4 +141,8 @@ Erase:    Yes
 
 ⚠️ Don’t forget to **power-cycle** after flashing.
 
+
+![17558463279078686634521759217553](https://github.com/user-attachments/assets/23fbf5c9-0abc-48af-8022-2cfee745771f)
+
+
 <img width="867" alt="Flash Tool" src="https://github.com/user-attachments/assets/a51058e4-aef6-4372-af57-780177bdcd26" />
