@@ -146,3 +146,43 @@ Erase:    Yes
 
 
 <img width="867" alt="Flash Tool" src="https://github.com/user-attachments/assets/a51058e4-aef6-4372-af57-780177bdcd26" />
+
+```
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: HRV – Mobile
+  - type: custom:mushroom-chips-card
+    alignment: justify
+    chips:
+      - type: template
+        entity: switch.hrv_hrv_power
+        icon: >
+          {% if is_state('switch.hrv_hrv_power','on') %}mdi:power{% else
+          %}mdi:power-off{% endif %}
+        icon_color: >
+          {% if is_state('switch.hrv_hrv_power','on') %}green{% else %}grey{%
+          endif %}
+        content: >
+          {% if is_state('switch.hrv_hrv_power','on') %}On{% else %}Off{% endif
+          %}
+        tap_action:
+          action: toggle
+      - type: template
+        entity: binary_sensor.hrv_boost_active_2
+        icon: mdi:rocket-launch
+        icon_color: >
+          {% if is_state('binary_sensor.hrv_boost_active_2','on') %}purple{%
+          else %}grey{% endif %}
+        content: |
+          {% if is_state('binary_sensor.hrv_boost_active_2','on') %}
+            Boost {{ states('sensor.hrv_hrv_boost_remaining') }}
+          {% else %}Boost Off{% endif %}
+      - type: template
+        entity: binary_sensor.hrv_filter_replacement_needed_2
+        icon: mdi:air-filter
+        icon_color: >
+          {% if is_state('binary_sensor.hrv_filter_replacement_needed_2','on')
+          %}red{% else %}green{% endif %}
+
+```
