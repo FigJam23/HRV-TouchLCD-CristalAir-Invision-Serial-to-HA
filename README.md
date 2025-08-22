@@ -1,7 +1,7 @@
 # HRV Touchscreen Controller
 <img src="https://github.com/user-attachments/assets/5137771c-f3e0-4be5-ac15-6035f58d54ce" width="240" height="320">
 
-
+<img src="https://github.com/user-attachments/assets/23fbf5c9-0abc-48af-8022-2cfee745771f" width="240" height="320">
 
 
 <img width="1099" alt="UI Screens" src="https://github.com/user-attachments/assets/15ab0996-d049-4504-8225-8518f2b27659" />
@@ -148,10 +148,9 @@ Erase:    Yes
 
 
 
+<img src="https://github.com/user-attachments/assets/a51058e4-aef6-4372-af57-780177bdcd26" width="800" height="650">
 
-<img width="867" alt="Flash Tool" src="https://github.com/user-attachments/assets/a51058e4-aef6-4372-af57-780177bdcd26" />
 
-![17558463279078686634521759217553](https://github.com/user-attachments/assets/23fbf5c9-0abc-48af-8022-2cfee745771f)
 ```
 type: vertical-stack
 cards:
@@ -335,4 +334,9 @@ cards:
             from: 120
             to: 365
 ```
-![17558473838112172195474073245787](https://github.com/user-attachments/assets/a0e9bd84-bcb8-4236-a833-73db9874a2c4)
+
+<img src="https://github.com/user-attachments/assets/a0e9bd84-bcb8-4236-a833-73db9874a2c4" width="800" height="650">
+
+
+
+
