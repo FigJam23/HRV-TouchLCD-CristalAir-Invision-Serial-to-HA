@@ -1,4 +1,5 @@
 # HRV Touchscreen Controller
+![17558554167863288455735259508](https://github.com/user-attachments/assets/5137771c-f3e0-4be5-ac15-6035f58d54ce)
 
 <img width="1099" alt="UI Screens" src="https://github.com/user-attachments/assets/15ab0996-d049-4504-8225-8518f2b27659" />
 
