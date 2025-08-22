@@ -151,39 +151,183 @@ Erase:    Yes
 ```
 type: vertical-stack
 cards:
+  # ===== HEADER =====
   - type: custom:mushroom-title-card
     title: HRV – Mobile
+
+  # ===== QUICK STATUS (includes Boost Remaining) =====
   - type: custom:mushroom-chips-card
     alignment: justify
     chips:
+      # Power (tap to toggle)
       - type: template
         entity: switch.hrv_hrv_power
         icon: >
-          {% if is_state('switch.hrv_hrv_power','on') %}mdi:power{% else
-          %}mdi:power-off{% endif %}
+          {% if is_state('switch.hrv_hrv_power','on') %}mdi:power{% else %}mdi:power-off{% endif %}
         icon_color: >
-          {% if is_state('switch.hrv_hrv_power','on') %}green{% else %}grey{%
-          endif %}
+          {% if is_state('switch.hrv_hrv_power','on') %}green{% else %}grey{% endif %}
         content: >
-          {% if is_state('switch.hrv_hrv_power','on') %}On{% else %}Off{% endif
-          %}
-        tap_action:
-          action: toggle
+          {% if is_state('switch.hrv_hrv_power','on') %}On{% else %}Off{% endif %}
+        tap_action: { action: toggle }
+
+      # Boost state + remaining
       - type: template
         entity: binary_sensor.hrv_boost_active_2
         icon: mdi:rocket-launch
         icon_color: >
-          {% if is_state('binary_sensor.hrv_boost_active_2','on') %}purple{%
-          else %}grey{% endif %}
-        content: |
+          {% if is_state('binary_sensor.hrv_boost_active_2','on') %}purple{% else %}grey{% endif %}
+        content: >
           {% if is_state('binary_sensor.hrv_boost_active_2','on') %}
             Boost {{ states('sensor.hrv_hrv_boost_remaining') }}
           {% else %}Boost Off{% endif %}
+
+      # Filter needed?
       - type: template
         entity: binary_sensor.hrv_filter_replacement_needed_2
         icon: mdi:air-filter
         icon_color: >
-          {% if is_state('binary_sensor.hrv_filter_replacement_needed_2','on')
-          %}red{% else %}green{% endif %}
+          {% if is_state('binary_sensor.hrv_filter_replacement_needed_2','on') %}red{% else %}green{% endif %}
+        content: >
+          {% if is_state('binary_sensor.hrv_filter_replacement_needed_2','on') %}Filter Needed{% else %}Filter OK{% endif %}
 
+      # House temp
+      - type: template
+        entity: sensor.hrv_house_temp_2
+        icon: mdi:home-thermometer
+        icon_color: >
+          {% set t = states('sensor.hrv_house_temp_2')|float(0) %}
+          {% if t < 15 %}blue{% elif t < 22 %}green{% elif t < 27 %}amber{% else %}red{% endif %}
+        content: "{{ states('sensor.hrv_house_temp_2') }}°C"
+
+      # Roof temp
+      - type: template
+        entity: sensor.hrv_hrv_roof_temp
+        icon: mdi:home-roof
+        icon_color: >
+          {% set t = states('sensor.hrv_hrv_roof_temp')|float(0) %}
+          {% if t < 10 %}blue{% elif t < 25 %}green{% elif t < 35 %}amber{% else %}red{% endif %}
+        content: "{{ states('sensor.hrv_hrv_roof_temp') }}°C"
+
+      # Humidity
+      - type: template
+        entity: sensor.hrv_house_humidity_2
+        icon: mdi:water-percent
+        icon_color: >
+          {% set h = states('sensor.hrv_house_humidity_2')|float(0) %}
+          {% if h < 35 %}blue{% elif h < 60 %}green{% else %}amber{% endif %}
+        content: "{{ states('sensor.hrv_house_humidity_2') }}%"
+
+  # ===== CONTROLS =====
+  - type: custom:stack-in-card
+    mode: vertical
+    cards:
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-number-card
+            entity: number.hrv_hrv_setpoint
+            name: Set °C
+            icon: mdi:thermometer-auto
+            display_mode: slider
+            fill_container: true
+          - type: custom:mushroom-number-card
+            entity: number.hrv_hrv_fan
+            name: Fan %
+            icon: mdi:fan
+            display_mode: slider
+            fill_container: true
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: switch.hrv_hrv_boost
+            name: Boost
+            icon: mdi:rocket
+            tap_action: { action: toggle }
+          - type: custom:mushroom-entity-card
+            entity: switch.hrv_hrv_power
+            name: Power
+            icon: mdi:power
+            tap_action: { action: toggle }
+      - type: custom:mushroom-entity-card
+        entity: number.hrv_hrv_filter_days_remaining
+        name: Set Filter Days
+        icon: mdi:calendar-clock
+
+  # ===== GRAPHS SIDE BY SIDE =====
+  - type: horizontal-stack
+    cards:
+      - type: custom:mini-graph-card
+        name: House Temp (24h)
+        entities: [ sensor.hrv_house_temp_2 ]
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 3
+        smoothing: true
+        show:
+          extrema: true
+          icon: false
+          name: true
+          state: true
+          graph: line
+        color_thresholds:
+          - value: 0
+            color: "#44739e"
+          - value: 18
+            color: "#1db954"
+          - value: 24
+            color: "#f0a202"
+          - value: 28
+            color: "#d00000"
+      - type: custom:mini-graph-card
+        name: Fan Actual (12h)
+        entities: [ sensor.hrv_hrv_fan_actual ]
+        hours_to_show: 12
+        points_per_hour: 8
+        line_width: 3
+        show:
+          icon: false
+          name: true
+          state: true
+          graph: bar
+
+  # ===== FILTER HEALTH SIDE BY SIDE =====
+  - type: horizontal-stack
+    cards:
+      - type: custom:bar-card
+        name: Life %
+        entities:
+          - entity: sensor.hrv_filter_life_2
+            name:  Life %
+        height: 24
+        positions: { icon: "off", indicator: "off", title: inside, value: inside }
+        min: 0
+        max: 100
+        severity:
+          - color: "#d00000"  # 0-20
+            from: 0
+            to: 20
+          - color: "#f0a202"  # 20-50
+            from: 20
+            to: 50
+          - color: "#1db954"  # 50-100
+            from: 50
+            to: 100
+      - type: custom:bar-card
+        name: Days
+        entities:
+          - entity: sensor.hrv_hrv_filter_days
+            name:  Days
+        height: 24
+        positions: { icon: "off", indicator: "off", title: inside, value: inside }
+        min: 0
+        max: 365
+        severity:
+          - color: "#d00000"   # 0-30
+            from: 0
+            to: 30
+          - color: "#f0a202"   # 30-120
+            from: 30
+            to: 120
+          - color: "#1db954"   # 120+
+            from: 120
+            to: 365
 ```
