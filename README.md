@@ -331,3 +331,4 @@ cards:
             from: 120
             to: 365
 ```
+![17558473838112172195474073245787](https://github.com/user-attachments/assets/a0e9bd84-bcb8-4236-a833-73db9874a2c4)
