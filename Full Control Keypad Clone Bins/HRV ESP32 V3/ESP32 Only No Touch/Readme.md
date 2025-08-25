@@ -1,3 +1,4 @@
+```
 /***********************
  *  HRV UART  (half-duplex bus on GPIO3/1)
  ***********************/
@@ -10,3 +11,4 @@
  ***********************/
 static const int PIN_I2C_SDA = 27;
 static const int PIN_I2C_SCL = 22;
+```
