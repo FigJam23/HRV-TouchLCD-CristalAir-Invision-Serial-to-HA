@@ -1,6 +1,6 @@
 ```
 /***********************
- *  HRV UART  (half-duplex bus on GPIO3/1)
+ *  HRV UART  (half-duplex bus)
  ***********************/
 #define HRV_RX_PIN 16
 #define HRV_TX_PIN 17
