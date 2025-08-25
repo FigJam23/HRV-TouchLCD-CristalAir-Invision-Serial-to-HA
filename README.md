@@ -2,8 +2,7 @@
 <img src="https://github.com/user-attachments/assets/5137771c-f3e0-4be5-ac15-6035f58d54ce" width="240" height="320">
 
 <img src="https://github.com/user-attachments/assets/23fbf5c9-0abc-48af-8022-2cfee745771f" width="240" height="320">
-<img src="https://github.com/user-attachments/assets/a0e9bd84-bcb8-4236-a833-73db9874a2c4" width="400" height="325">
-<img width="354" height="873" alt="image" src="https://github.com/user-attachments/assets/f5a4f57c-e3fa-4543-ac92-ea758efed620" />
+
 
 <img width="1099" alt="UI Screens" src="https://github.com/user-attachments/assets/15ab0996-d049-4504-8225-8518f2b27659" />
 
@@ -337,6 +336,7 @@ cards:
             to: 365
 ```
 
+<img width="354" height="873" alt="image" src="https://github.com/user-attachments/assets/f5a4f57c-e3fa-4543-ac92-ea758efed620" />
 
 
 
