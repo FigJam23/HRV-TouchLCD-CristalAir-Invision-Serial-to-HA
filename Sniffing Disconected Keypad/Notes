@@ -1,9 +1,0 @@
-#	Part	Notes
-
-1	RJ-11 “Bus” Port (JP1)	The 6-pin jack where the panel plugs in.  Pins 1/6 = 12 V supply, 2/5 = GND, <br>3 = TTL-RX, 4 = TTL-TX.
-2	TTL Header	Small 5-pin header just above the RJ-11.  Labeled TXD, RXD, VCC, GND, EN (enable).
-3	RS-485 Transceiver (U5)	Bottom-center 16-pin chip next to the “B A” silk-screen.  Likely a MAX3485 or MAX13487.
-4	RS-485 Bus Pads (B/A)	The two solder-pad pairs marked “B” and “A” just below U4/U5.  These go out to the roof unit.
-5	TTL-to-5 V Regulator + Shifter (U4)	Small 6-pin IC just above the B/A pads.  Handles level-shifting for the TTL header.
-6	Main MCU (U1)	The big square at top-center—runs the touch firmware and formats the comms frames.
-
