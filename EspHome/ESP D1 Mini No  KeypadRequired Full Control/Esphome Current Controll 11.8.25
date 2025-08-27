@@ -1,65 +1,51 @@
 esphome:
-  name: hrv
-  friendly_name: HRV
-
-  on_boot:
-    priority: -10
-    then:
-      - delay: 500ms
-      - lambda: |-
-          // Always start with boost OFF on reboot
-          id(boost_active) = false;
-          id(hrv_boost_active).publish_state(false);
-
-          // Restore last fan %
-          int p = (int) id(fan_percent).state;   // restore_value: yes
-          if (p < 0 || p > 100) p = 10;
-          id(target_percent) = p;
-          id(last_nonzero_percent) = (p > 0) ? p : 10;
-          id(fan_percent).publish_state(p);
-          id(hrv_fan_speed).publish_state(p);
-          id(send_fan).execute();
-          id(last_rx_ms) = millis();
-      - script.execute: boot_handshake
+  name: hrv-public
+  friendly_name: HRV Controller
+  project:
+    name: yourname/hrv-controller
+    version: "1.0.0"
+  # Let others "Adopt" this device from their ESPHome dashboard (they'll pull your YAML from a URL).
+  # Replace with your raw GitHub URL later, or leave as-is and they can just adopt locally.
+  dashboard_import:
+    package_import_url: "https://example.com/hrv_public.yaml"  # <- optional, replace with your YAML URL
 
 esp8266:
   board: d1_mini
 
+# --- Wi-Fi provisioning (no hardcoded SSID/pass) ---
 wifi:
-  ssid: "Reaver"
-  password: "Figjam"
-  manual_ip:
-    static_ip: 192.168.1.100
-    gateway: 192.168.1.1
-    subnet: 255.255.255.0
-  power_save_mode: none
-  fast_connect: true
-  reboot_timeout: 5min
   ap:
-    ssid: "Hrv Fallback Hotspot"
-    password: "Just"
+    ssid: "HRV-Setup"
+    password: "changeme123"
+
+captive_portal:
+
+# Optional serial provisioning (works with esp-web-tools)
+improv_serial:
 
 logger:
   baud_rate: 115200
   level: WARN
 
+# Native ESPHome API for HA autodiscovery (no key in public build)
 api:
-  encryption:
-    key: "hZXm4NPWC33G3NS3kzqXkXR5mHUn/PUIUY+8RTcm4Ps="
   reboot_timeout: 0s
 
+# Leave OTA open for first flash; users should set a password after adoption
 ota:
   platform: esphome
-  password: "283355a588a90db0f31782330ad9f820"
 
-#web_server:
- # port: 80
+# Small web UI (optional)
+web_server:
+  port: 80
 
+# ---- MQTT (for HA MQTT Discovery) ----
+# Left with a placeholder broker. After adoption in ESPHome, users edit broker/creds and OTA-update.
 mqtt:
   id: hrv_mqtt
-  broker: 192.168.1.44
-  username: mqtt
-  password: Just
+  broker: 0.0.0.0        # <--- placeholder; user must change in ESPHome after adopting
+  # username: mqtt       # <--- user adds if needed
+  # password: secret     # <--- user adds if needed
   client_id: hrv
   discovery: true
   discovery_unique_id_generator: mac
@@ -109,29 +95,52 @@ mqtt:
             id(hrv_fan_speed).publish_state(p);
             id(send_fan).execute();
 
+# --- Boot logic (unchanged) ---
+on_boot:
+  priority: -10
+  then:
+    - delay: 500ms
+    - lambda: |-
+        // Always start with boost OFF on reboot
+        id(boost_active) = false;
+        id(hrv_boost_active).publish_state(false);
+
+        // Restore last fan %
+        int p = (int) id(fan_percent).state;   // restore_value: yes
+        if (p < 0 || p > 100) p = 10;
+        id(target_percent) = p;
+        id(last_nonzero_percent) = (p > 0) ? p : 10;
+        id(fan_percent).publish_state(p);
+        id(hrv_fan_speed).publish_state(p);
+        id(send_fan).execute();
+        id(last_rx_ms) = millis();
+    - script.execute: boot_handshake
+
+# --- Status LED (optional) ---
 output:
   - platform: gpio
     pin: GPIO2
     id: led
     inverted: true
 
+# --- HRV UART (keep HRV bus on D1/D2) ---
 uart:
   id: hrv_uart
-  rx_pin: D2         # keep HRV bus on D1/D2
+  rx_pin: D2
   tx_pin: D1
   baud_rate: 1200
   data_bits: 8
   parity: NONE
   stop_bits: 1
 
-# ---------- I²C for SHT31 (uses free pins D6/D5) ----------
+# --- I²C for SHT31 (D6/D5) ---
 i2c:
   sda: D6            # GPIO12
   scl: D5            # GPIO14
   scan: true
   frequency: 100kHz
 
-# When your SHT31 arrives, uncomment this block:
+# Uncomment when SHT31 is present
 # sensor:
 #   - platform: sht3xd
 #     address: 0x44
@@ -221,6 +230,7 @@ globals:
   - id: sensor_timeout_ms
     type: uint32_t
     initial_value: "15000"
+
   - id: hrv_days_remaining
     type: int
     restore_value: yes
@@ -291,7 +301,6 @@ globals:
 # SENSORS
 # =========================
 sensor:
-  # --- TEMP STUBS until SHT31 arrives (no spam) ---
   - platform: template
     name: "House Temp"
     id: hrv_house_temp
@@ -309,7 +318,6 @@ sensor:
     update_interval: 60s
     lambda: 'return NAN;'
 
-  # From controller (parsed via UART)
   - platform: template
     name: "Roof Temp"
     id: hrv_roof_temp
@@ -361,14 +369,11 @@ sensor:
     lambda: |-
       return id(cycles);
 
-
   - platform: template
     name: "ESP Free Heap"
     unit_of_measurement: "bytes"
     update_interval: 60s
     lambda: 'return ESP.getFreeHeap();'
-
-
 
 number:
   - platform: template
@@ -528,6 +533,9 @@ binary_sensor:
     lambda: |-
       return id(boost_active);
 
+# =========================
+# SCRIPTS
+# =========================
 script:
   - id: apply_baseline_if_idle
     mode: restart
@@ -635,29 +643,29 @@ script:
     mode: queued
     then:
       - lambda: |-
-          uint32_t now = millis();
-          uint32_t gap = (now - id(last_tx_ms));
-          if (gap < 140) { delay(140 - gap); yield(); }
+        uint32_t now = millis();
+        uint32_t gap = (now - id(last_tx_ms));
+        if (gap < 140) { delay(140 - gap); yield(); }
 
-          int p = id(target_percent);
-          if (p < 0) p = 0; if (p > 100) p = 100;
+        int p = id(target_percent);
+        if (p < 0) p = 0; if (p > 100) p = 100;
 
-          uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
+        uint8_t code = (p <= 30) ? 0x4E : (p <= 75 ? 0x4F : 0x50);
 
-          std::vector<uint8_t> body{0x31,0x01,code,(uint8_t)p,0x1E,0x84,0xF0};
-          std::vector<uint8_t> f{0x7E};
-          f.insert(f.end(), body.begin(), body.end());
-          int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
-          f.push_back((uint8_t)sum); f.push_back(0x7E);
+        std::vector<uint8_t> body{0x31,0x01,code,(uint8_t)p,0x1E,0x84,0xF0};
+        std::vector<uint8_t> f{0x7E};
+        f.insert(f.end(), body.begin(), body.end());
+        int sum=0; for (size_t i=1;i<f.size(); ++i) sum -= f[i];
+        f.push_back((uint8_t)sum); f.push_back(0x7E);
 
-          auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
-          id(last_sent_ms) = millis();
-          id(last_tx_ms)   = id(last_sent_ms);
+        auto u=id(hrv_uart); for (auto v: f) u->write_byte(v);
+        id(last_sent_ms) = millis();
+        id(last_tx_ms)   = id(last_sent_ms);
 
-          id(hrv_fan_speed).publish_state(p);
-          id(ts_fan) = millis();
+        id(hrv_fan_speed).publish_state(p);
+        id(ts_fan) = millis();
 
-          std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
+        std::string s; char tmp[4]; for (auto v: f){ sprintf(tmp,"%02X ",v); s+=tmp; } id(last_tx).publish_state(s);
 
   - id: start_boost
     mode: restart
@@ -774,6 +782,9 @@ script:
           if (now - id(ts_house) > to) id(hrv_house_temp).publish_state(0);
           if (now - id(ts_roof)  > to) id(hrv_roof_temp).publish_state(0);
 
+# =========================
+# INTERVALS
+# =========================
 interval:
   - interval: 80ms
     then:
