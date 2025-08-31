@@ -1,3 +1,8 @@
+# Demo of this Version
+
+https://youtube.com/shorts/ByNAx1_QtX8?si=mW8x7UHjuPzPWhZI
+
+
 found bug on this version, likey on all previous versions. If wifi disconnects touch screen falls back to AP mode and never reconnects without manual interaction. this will be fixed on next version of bug fixes. also will be adding screen time outs so if no touches / activity within a set time return to home screen.... Comming soon
 
 
