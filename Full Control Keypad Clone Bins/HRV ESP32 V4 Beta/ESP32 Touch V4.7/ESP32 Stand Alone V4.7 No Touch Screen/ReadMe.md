@@ -1,3 +1,4 @@
+```
 /***********************
  *  ESP32 RXTX to HRV Bus Comms
  ***********************/
@@ -15,4 +16,5 @@ static const int PIN_I2C_SCL = 22;
  ***********************/
 
 static const char* AP_SSID       = "HRV-Keypad";
-static const char* AP_PASS       = "12345678";  
+static const char* AP_PASS       = "12345678";
+```
