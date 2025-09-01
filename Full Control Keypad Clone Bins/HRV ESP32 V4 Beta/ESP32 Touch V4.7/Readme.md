@@ -7,6 +7,26 @@ https://youtube.com/shorts/ByNAx1_QtX8?si=mW8x7UHjuPzPWhZI
 
 <img width="930" height="278" alt="image" src="https://github.com/user-attachments/assets/fbc4d95a-bf50-4a74-8571-9cf65c2a7914" />
 
+```
+/***********************
+ *  ESP32 RXTX to HRV Bus Comms
+ ***********************/
+#define HRV_RX_PIN 35
+#define HRV_TX_PIN 1
+
+/***********************
+ *  SHT31 on I²C
+ ***********************/
+static const int PIN_I2C_SDA = 27;
+static const int PIN_I2C_SCL = 22;
+
+/***********************
+ * Default AP Logins
+ ***********************/
+
+static const char* AP_SSID       = "HRV-Keypad";
+static const char* AP_PASS       = "12345678";
+```
 
 # Hassio Card
 
