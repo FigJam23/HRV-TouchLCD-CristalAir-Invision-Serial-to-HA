@@ -110,6 +110,8 @@ Graphs:
 
 12h Fan Actual history.
 
+<img width="649" height="752" alt="image" src="https://github.com/user-attachments/assets/0bfebeaa-d236-4148-a9df-6842acefcf2a" />
+
 
 ```
 type: vertical-stack
