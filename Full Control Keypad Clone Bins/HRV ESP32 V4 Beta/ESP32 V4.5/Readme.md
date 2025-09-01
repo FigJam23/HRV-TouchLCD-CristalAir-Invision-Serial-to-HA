@@ -10,7 +10,7 @@ found bug on this version, likey on all previous versions. If wifi disconnects t
 
 
 # Hassio Card
-```
+
 Requirements for HRV – Mobile Dashboard Card
 
 This Lovelace configuration uses several custom cards from HACS (Home Assistant Community Store).
@@ -111,7 +111,6 @@ Graphs:
 
 12h Fan Actual history.
 
-```
 
 ```
 type: vertical-stack
