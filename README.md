@@ -1,6 +1,9 @@
 # HRV Touchscreen Controller
 <img src="https://github.com/user-attachments/assets/5137771c-f3e0-4be5-ac15-6035f58d54ce" width="240" height="320">
 
+# Latest Touch Screen Version 
+https://github.com/FigJam23/HRV-TouchLCD-CristalAir-Invision-Serial-to-HA/tree/main/Full%20Control%20Keypad%20Clone%20Bins/HRV%20ESP32%20V4%20Beta/ESP32%20Touch%20V4.7
+
 # Demo Video V4.5
 https://youtube.com/shorts/ByNAx1_QtX8?si=3zPxQ_3Zqc1vG71k
 
