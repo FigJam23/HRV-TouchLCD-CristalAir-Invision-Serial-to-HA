@@ -30,6 +30,6 @@ static const int PIN_TOUCH_MISO = 39;
 static const int PIN_TOUCH_SCLK = 25;
 static const int PIN_TFT_BL     = 21;
 
-// --- BUZZER: 2-pin header on back of screen ---
+// --- BUZZER: / Speaker
 static const int BUZZER_PIN = 26;
 ```
