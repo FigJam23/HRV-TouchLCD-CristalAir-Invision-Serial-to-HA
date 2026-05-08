@@ -1,5 +1,5 @@
 
-Here’s a quick `README.md` you can paste into the repo.
+
 
 ````markdown
 # HRV ESP32 V4 Beta - Auto Sniff & Learn
