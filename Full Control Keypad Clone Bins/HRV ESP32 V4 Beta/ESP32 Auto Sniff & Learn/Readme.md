@@ -1,7 +1,5 @@
 
-<img width="1857" height="796" alt="image" src="https://github.com/user-attachments/assets/148c83ef-033b-48f5-8713-dc1fe2aab01f" />
-<img width="1427" height="813" alt="image" src="https://github.com/user-attachments/assets/fbd31c42-2870-4b26-9568-7cdd43050722" />
-<img width="1322" height="872" alt="image" src="https://github.com/user-attachments/assets/bba7419e-1d65-4e84-8f20-661476cca524" />
+
 
 Jason Cap Example
 
