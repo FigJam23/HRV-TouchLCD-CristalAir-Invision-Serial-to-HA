@@ -1,9 +1,9 @@
 
-HRV Keypad Beta 4.8
+HRV Keypad  4.8
 
-Beta 4.8 is a testing build focused on reliability, state syncing, and better recovery after power loss or network interruptions. This version improves how the touchscreen UI, web UI, MQTT, and retained settings stay aligned, while also adding SD card persistence for key values and status history.
+4.8 is a testing build focused on reliability, state syncing, and better recovery after power loss or network interruptions. This version improves how the touchscreen UI, web UI, MQTT, and retained settings stay aligned, while also adding SD card persistence for key values and status history.
 
-What is new in Beta 4.8
+What is new in  4.8
 Power state syncing improvements
 
 The power state now behaves much more consistently across the touchscreen, web UI, and Home Assistant/MQTT.
@@ -146,7 +146,7 @@ Filter days number
 
 SD card persistence and logging
 
-Beta 4.8 adds SD card support for persistence and simple status logging.
+4.8 adds SD card support for persistence and simple status logging.
 
 Added:
 
