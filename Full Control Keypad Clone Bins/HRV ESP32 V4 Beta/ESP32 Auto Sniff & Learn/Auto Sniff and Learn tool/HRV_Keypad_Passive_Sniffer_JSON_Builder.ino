@@ -549,7 +549,40 @@ body{font-family:system-ui,Arial;margin:0;background:#f5f7fa;color:#222}header{b
 <div class="card"><h3>3. Export JSON</h3><a class="btn" href="/profile" target="_blank">View JSON profile</a><a class="btn" href="/download">Download JSON profile</a><button onclick="copyProfile()">Copy JSON to clipboard</button><pre id="profile">{}</pre></div>
 <div class="card"><h3>Recent Frames</h3><button onclick="cmd('/clear_recent')">Clear recent</button><table><thead><tr><th>ms</th><th>OK</th><th>Count</th><th>Payload only</th><th>Checksum</th><th>Full frame</th></tr></thead><tbody id="frames"></tbody></table></div>
 </main><script>
-async function getJson(url){return fetch(url).then(r=>r.json())} async function getText(url){return fetch(url).then(r=>r.text())} async function cmd(url){await fetch(url); await tick()} async function learn(action){await fetch('/learn?action='+encodeURIComponent(action)); await tick()} async function copyProfile(){const txt=await getText('/profile'); await navigator.clipboard.writeText(txt); alert('JSON profile copied')}
+async function getJson(url){return fetch(url).then(r=>r.json())} async function getText(url){return fetch(url).then(r=>r.text())} async function cmd(url){await fetch(url); await tick()} async function learn(action){await fetch('/learn?action='+encodeURIComponent(action)); await tick()}
+async function copyProfile(){
+  const txt = await getText('/profile');
+
+  // navigator.clipboard often fails on ESP web pages served over plain HTTP/IP.
+  // Try it first, then fall back to a hidden textarea copy method.
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(txt);
+      alert('JSON profile copied');
+      return;
+    }
+  } catch(e) {}
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+
+    if (ok) alert('JSON profile copied');
+    else alert('Copy failed. Use Download JSON profile instead.');
+  } catch(e) {
+    alert('Copy failed. Use Download JSON profile instead.');
+  }
+}
 async function loadWifi(){try{const w=await getJson('/wifi'); document.getElementById('wfssid').value=w.ssid||''; document.getElementById('wfpw').value=w.pass||'';}catch(e){}}
 async function saveWifi(){const ssid=encodeURIComponent(document.getElementById('wfssid').value.trim()); const pass=encodeURIComponent(document.getElementById('wfpw').value); document.getElementById('wfmsg').textContent='Saving...'; try{const r=await getJson('/wifi?ssid='+ssid+'&pass='+pass); document.getElementById('wfmsg').textContent=r.ok?'Saved. Connecting...':'Failed'; setTimeout(tick,1500);}catch(e){document.getElementById('wfmsg').textContent='Error';}}
 async function clearWifi(){if(!confirm('Forget saved Wi-Fi and use AP only?'))return; await getJson('/wifi_clear'); document.getElementById('wfssid').value=''; document.getElementById('wfpw').value=''; document.getElementById('wfmsg').textContent='Wi-Fi forgotten'; setTimeout(tick,1000);}
